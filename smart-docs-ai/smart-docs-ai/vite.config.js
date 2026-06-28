@@ -21,6 +21,17 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path,
+        // Timeout đủ dài để Lambda cold start nạp mô hình (tối đa ~60 giây)
+        proxyTimeout: 180000,
+        timeout: 180000,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.log('[Vite Proxy Error]', err.message);
+          });
+          proxy.on('proxyReq', (proxyReq, req) => {
+            console.log('[Vite Proxy]', req.method, req.url, '→ AWS Lambda');
+          });
+        },
       }
     }
   },
