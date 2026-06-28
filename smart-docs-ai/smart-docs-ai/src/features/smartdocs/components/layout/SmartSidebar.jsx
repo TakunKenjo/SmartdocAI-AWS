@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { ThemeContext } from "@/contexts/ThemeContext.jsx";
 import {
   checkOllamaStatus,
+  fetchProcessedFiles,
+  fetchChatHistory,
   selectOllamaStatus,
   selectStatusLoading,
   selectProcessedFiles,
@@ -32,11 +34,13 @@ function SmartSidebar() {
   const processedFiles = useSelector(selectProcessedFiles);
   const totalChunks = useSelector(selectTotalChunks);
 
-  // Kiểm tra Ollama khi mount
+  // Kiểm tra Ollama, danh sách tài liệu và lịch sử chat khi mount
   useEffect(() => {
     if (ollamaStatus === null) {
       dispatch(checkOllamaStatus());
     }
+    dispatch(fetchProcessedFiles());
+    dispatch(fetchChatHistory());
   }, [dispatch, ollamaStatus]);
 
   const totalPages = processedFiles.reduce((sum, f) => sum + (f.pages || 0), 0);

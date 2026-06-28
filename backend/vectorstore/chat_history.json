@@ -1,0 +1,350 @@
+[
+  {
+    "role": "user",
+    "content": "tóm tắt",
+    "sources": [],
+    "question_ctx": "",
+    "answer_ctx": "",
+    "self_rag_meta": null,
+    "co_rag_meta": null,
+    "timestamp": 1782448000.5850952
+  },
+  {
+    "role": "assistant",
+    "content": " Tài liệu \"TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx\" có ",
+    "sources": [
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 6,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "....\nCHƯƠNG 3: KẾT QUẢ THỰC TẬP\nGhi nhận các kết quả cụ thể đã đạt được trong đợt thực tập\n(các bảng thông tin tiếp theo là để minh họa)\nBẢNG GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN\nSinh viên có thể trình bày chi tiết hơn các công việc đã làm trong mỗi tuần  (mẫu 6)\nCuối phần C này đính kèm là bảng GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN có chữ ký của chuyên gia hướng dẫn.\nBẢNG ĐÁNH GIÁ QUÁ TRÌNH THỰC TẬP TỐT NGHIỆP\n(Do chuyên gia doanh nghiệp đánh giá).  mẫu 7\nPHIẾU ĐÁNH GIÁ KẾT QUẢ THỰC TẬP TỐT NGHIỆP\n(Do giảng viên hướng dẫn đánh giá) mẫu 8\nKết luận chương 3\n....\nCHƯƠNG 4. KẾT LUẬN VÀ KIẾN NGHỊ\nNhững nội dung đã học hỏi được qua đợt thực tập; những kiến nghị về mặt khoa học liên quan đến quá trình thực tập tốt nghiệp\nMột số kiến nghị với doanh nghiệp, với cơ sở đào tạo để rút kinh nghiệm về công tác thực tập\nTÀI LIỆU THAM KHẢO\nTên tác giả, tên công trình, nhà xuất bản, năm xuất bản.\nTên tác giả, tên công trình, nhà xuất bản, năm xuất bản.\nPHỤ LỤC\nCác quy trình, tài liệu của doanh nghiệp mà sinh viên đã có trích dẫn trong quyển báo cáo thực tập tốt nghiệp (các tài liệu này cần được sự cho phép tiếp cận của doanh nghiệp thông qua chuyên gia doanh nghiệp hướng dẫn)\n(văn bản gốc nếu có)\nQuy định trình bày quyển báo cáo thực tập tốt nghiệp\nFont: Times New Roman\nĐóng bìa kiếng, in  khổ giấy A4, in 1 mặt\nCăn lề:\nLề trái: 3cm\nLề phải:2cm\nLề trên: 2cm\nLề dưới:2cm",
+        "chunk_index": 1,
+        "score": 0.264
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 5,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "LỜI MỞ ĐẦU\nCHƯƠNG 1. GIỚI THIỆU\nGiới thiệu công ty thực tập\nMột số thông tin gợi ý:\nTên công ty, địa chỉ, email, số điện thoại\nCơ sở vật chất của doanh nghiệp\nCơ cấu tổ chức của doanh nghiệp\nLĩnh vực hoạt động của doanh nghiệp\nCác sản phẩm quan trọng của doanh nghiệp\nCác đối tác hiện có của doanh nghiệp\nCác quy trình của doanh nghiệp (có thể chọn trình bày chi tiết một số quy trình phù hợp nhất với công việc dự kiến của sinh viên sau tốt nghiệp)\nSinh viên được phân công thực tập ở phòng ban nào của doanh nghiệp\nThông tin ngắn về chuyên gia của doanh nghiệp hướng dẫn trực tiếp.\nNhững nội dung mà sinh viên cần học hỏi thêm khi thực tập tại doanh nghiệp\nNhiệm vụ thực tập\nGhi rõ các công việc mà phía chuyên gia doanh nghiệp giao cho dựa theo đề cương chi tiết học phần thực tập tốt nghiệp\nTìm hiểu các quy trình công việc\nNghiên cứu một công nghệ mới\nTham gia vào một dự án của công ty,...\nKết luận chương 1\n....\nCHƯƠNG 2. TÊN CHƯƠNG ?\nĐây là phần chính của quyển báo cáo thực tập tốt nghiệp; với mỗi nội dung được giao, sinh viên cần hoàn thành dưới sự hướng dẫn của chuyên gia doanh nghiệp và sự hỗ trợ từ phía giảng viên hướng dẫn của cơ sở đào tạo.\nSinh viên cần trình bày trong quyển báo cáo này giải pháp giải quyết từng nội dung, kết quả đạt được của từng nội dung.\nNếu có thực nghiệm hoặc viết chương trình thì trình bày kết quả thực nghiệm hoặc các giao diện của chương trình kèm theo.\nQuyển báo cáo cần có những phân tích, nhận định, quan sát cá nhân của sinh viên.\nKết luận chương 2",
+        "chunk_index": 2,
+        "score": 0.251
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 7,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "Đánh số trang vào cuối giữa trang, trang 1 bắt đầu từ Lời mở đầu. Các trang trước đó đánh i, ii,iii,...trừ trang bìa và trang lót bìa không đánh số trang.\nGiãn dòng: Từ 1.3 đến 1.5 lines\nMục lục quyển báo cáo được đánh tự động\nCác hình vẽ, bảng biểu được đánh chỉ mục theo mỗi chương và phải có tiêu đề cho các bảng, hình vẽ, các công thức được đánh chỉ số (theo chương) ở bên phải.\nSinh viên chuyển cho 2 cán bộ hướng dẫn file PDF (1 file duy nhất chứa toàn bộ nội dung của quyển báo cáo thực tập tốt nghiệp).\nChương x: size 16, in đậm, chữ hoa\nx.1 // size 14, in đậm chữ hoa\nx.1.1.// size 13, in đậm\nx.1.1.1. // size 13, in nghiêng; đánh chỉ mục tối đa 4 cấp\nx.2.\nx.2.1.\nx.2.1.1.\n....",
+        "chunk_index": 3,
+        "score": 0.144
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 1,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "ỦY BAN NHÂN DÂN TP HỒ CHÍ MINH\nTRƯỜNG ĐẠI HỌC SÀI GÒN\nKHOA CÔNG NGHỆ THÔNG TIN\nHọ và tên sinh viên :\nBÁO CÁO\nTHỰC TẬP TỐT NGHIỆP\nCông ty thực tập\t\t:xxx\nChuyên gia hướng dẫn\t:xxx\nGiảng viên hướng dẫn\t:xxx\nTP. Hồ Chí Minh, tháng ….. năm 2018\nMỤC LỤC\nNHẬN XÉT CỦA CHUYÊN GIA DOANH NGHIỆP",
+        "chunk_index": 4,
+        "score": 0.026
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 2,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................",
+        "chunk_index": 5,
+        "score": -0.256
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 2,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": ". ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................",
+        "chunk_index": 6,
+        "score": -0.256
+      }
+    ],
+    "question_ctx": "tóm tắt",
+    "answer_ctx": " Tài liệu \"TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx\" có ",
+    "self_rag_meta": null,
+    "co_rag_meta": null,
+    "timestamp": 1782448003.317075
+  },
+  {
+    "role": "user",
+    "content": "tóm tắt tài liệu",
+    "sources": [],
+    "question_ctx": "",
+    "answer_ctx": "",
+    "self_rag_meta": null,
+    "co_rag_meta": null,
+    "timestamp": 1782448076.7229757
+  },
+  {
+    "role": "assistant",
+    "content": " Tài liệu \"TTTN\\_Mau9\\_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx\" có chi tiết như sau:\n\n- Lời mở đầu: Giới thiệu tên công ty thực tập, địa chỉ, email, số điện thoại, cơ sở vật chất, cơ cấu tổ chức, lĩnh vực hoạt động, sản phẩm quan trọng, đối tác, quy trình công việc và nhiệm vụ thực tập.\n\n- Chương 1: Giới thiệu chuyên gia hướng dẫn và những nội dung mà sinh viên cần học hỏi thêm khi thực tập tại doanh nghiệp.\n\n- Chương 2: Phần chính của báo cáo thực tập, sinh viên cần trình bày giải pháp và kết quả đạt được cho từng nội dung, cũng như phân tích, nhận định và quan sát cá nhân.\n\n- Chương 3: Kết quả thực tập, bao gồm bảng ghi nhận kết quả thực tập hàng tuần và bảng đánh giá quá trình thực tập tốt nghiệp (do chuyên gia doanh nghiệp đánh giá).\n\n- Chương 4: Kết luận và kiến nghị với doanh nghiệp và cơ sở đào tạo.\n\n- Phụ lục: Các quy trình, tài liệu của doanh nghiệp mà sinh viên đã trích dẫn trong quyển báo cáo thực tập tốt nghiệp.\n\n- Tham khảo: Danh sách các tài liệu tham khảo.\n\n- Mẫu 6 và 7: Bảng ghi nhận kết quả thực tập hàng tuần và bảng đánh giá quá trình thực tập tốt nghiệp.\n\n- Giấy chú thích: Nhận xét của chuyên gia doanh nghiệp.\n\n- Quy định trình bày: Chỉ dẫn về kiểu chữ, kích thước, đánh số trang, định dạng hình vẽ, bảng biểu và các công thức.\n\n[Nguồn 1: TTTN\\_Mau9\\_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 6]\n[Nguồn 2: TTTN\\_Mau9\\_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 5]\n[Nguồn 3: TTTN\\_Mau9\\_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 1]\n[Nguồn 4: TTTN\\_Mau9\\_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 7]\n[Nguồn 5: TTTN\\_Mau9\\_SINH",
+    "sources": [
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 6,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "....\nCHƯƠNG 3: KẾT QUẢ THỰC TẬP\nGhi nhận các kết quả cụ thể đã đạt được trong đợt thực tập\n(các bảng thông tin tiếp theo là để minh họa)\nBẢNG GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN\nSinh viên có thể trình bày chi tiết hơn các công việc đã làm trong mỗi tuần  (mẫu 6)\nCuối phần C này đính kèm là bảng GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN có chữ ký của chuyên gia hướng dẫn.\nBẢNG ĐÁNH GIÁ QUÁ TRÌNH THỰC TẬP TỐT NGHIỆP\n(Do chuyên gia doanh nghiệp đánh giá).  mẫu 7\nPHIẾU ĐÁNH GIÁ KẾT QUẢ THỰC TẬP TỐT NGHIỆP\n(Do giảng viên hướng dẫn đánh giá) mẫu 8\nKết luận chương 3\n....\nCHƯƠNG 4. KẾT LUẬN VÀ KIẾN NGHỊ\nNhững nội dung đã học hỏi được qua đợt thực tập; những kiến nghị về mặt khoa học liên quan đến quá trình thực tập tốt nghiệp\nMột số kiến nghị với doanh nghiệp, với cơ sở đào tạo để rút kinh nghiệm về công tác thực tập\nTÀI LIỆU THAM KHẢO\nTên tác giả, tên công trình, nhà xuất bản, năm xuất bản.\nTên tác giả, tên công trình, nhà xuất bản, năm xuất bản.\nPHỤ LỤC\nCác quy trình, tài liệu của doanh nghiệp mà sinh viên đã có trích dẫn trong quyển báo cáo thực tập tốt nghiệp (các tài liệu này cần được sự cho phép tiếp cận của doanh nghiệp thông qua chuyên gia doanh nghiệp hướng dẫn)\n(văn bản gốc nếu có)\nQuy định trình bày quyển báo cáo thực tập tốt nghiệp\nFont: Times New Roman\nĐóng bìa kiếng, in  khổ giấy A4, in 1 mặt\nCăn lề:\nLề trái: 3cm\nLề phải:2cm\nLề trên: 2cm\nLề dưới:2cm",
+        "chunk_index": 1,
+        "score": 0.195
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 5,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "LỜI MỞ ĐẦU\nCHƯƠNG 1. GIỚI THIỆU\nGiới thiệu công ty thực tập\nMột số thông tin gợi ý:\nTên công ty, địa chỉ, email, số điện thoại\nCơ sở vật chất của doanh nghiệp\nCơ cấu tổ chức của doanh nghiệp\nLĩnh vực hoạt động của doanh nghiệp\nCác sản phẩm quan trọng của doanh nghiệp\nCác đối tác hiện có của doanh nghiệp\nCác quy trình của doanh nghiệp (có thể chọn trình bày chi tiết một số quy trình phù hợp nhất với công việc dự kiến của sinh viên sau tốt nghiệp)\nSinh viên được phân công thực tập ở phòng ban nào của doanh nghiệp\nThông tin ngắn về chuyên gia của doanh nghiệp hướng dẫn trực tiếp.\nNhững nội dung mà sinh viên cần học hỏi thêm khi thực tập tại doanh nghiệp\nNhiệm vụ thực tập\nGhi rõ các công việc mà phía chuyên gia doanh nghiệp giao cho dựa theo đề cương chi tiết học phần thực tập tốt nghiệp\nTìm hiểu các quy trình công việc\nNghiên cứu một công nghệ mới\nTham gia vào một dự án của công ty,...\nKết luận chương 1\n....\nCHƯƠNG 2. TÊN CHƯƠNG ?\nĐây là phần chính của quyển báo cáo thực tập tốt nghiệp; với mỗi nội dung được giao, sinh viên cần hoàn thành dưới sự hướng dẫn của chuyên gia doanh nghiệp và sự hỗ trợ từ phía giảng viên hướng dẫn của cơ sở đào tạo.\nSinh viên cần trình bày trong quyển báo cáo này giải pháp giải quyết từng nội dung, kết quả đạt được của từng nội dung.\nNếu có thực nghiệm hoặc viết chương trình thì trình bày kết quả thực nghiệm hoặc các giao diện của chương trình kèm theo.\nQuyển báo cáo cần có những phân tích, nhận định, quan sát cá nhân của sinh viên.\nKết luận chương 2",
+        "chunk_index": 2,
+        "score": 0.149
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 1,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "ỦY BAN NHÂN DÂN TP HỒ CHÍ MINH\nTRƯỜNG ĐẠI HỌC SÀI GÒN\nKHOA CÔNG NGHỆ THÔNG TIN\nHọ và tên sinh viên :\nBÁO CÁO\nTHỰC TẬP TỐT NGHIỆP\nCông ty thực tập\t\t:xxx\nChuyên gia hướng dẫn\t:xxx\nGiảng viên hướng dẫn\t:xxx\nTP. Hồ Chí Minh, tháng ….. năm 2018\nMỤC LỤC\nNHẬN XÉT CỦA CHUYÊN GIA DOANH NGHIỆP",
+        "chunk_index": 3,
+        "score": 0.084
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 7,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "Đánh số trang vào cuối giữa trang, trang 1 bắt đầu từ Lời mở đầu. Các trang trước đó đánh i, ii,iii,...trừ trang bìa và trang lót bìa không đánh số trang.\nGiãn dòng: Từ 1.3 đến 1.5 lines\nMục lục quyển báo cáo được đánh tự động\nCác hình vẽ, bảng biểu được đánh chỉ mục theo mỗi chương và phải có tiêu đề cho các bảng, hình vẽ, các công thức được đánh chỉ số (theo chương) ở bên phải.\nSinh viên chuyển cho 2 cán bộ hướng dẫn file PDF (1 file duy nhất chứa toàn bộ nội dung của quyển báo cáo thực tập tốt nghiệp).\nChương x: size 16, in đậm, chữ hoa\nx.1 // size 14, in đậm chữ hoa\nx.1.1.// size 13, in đậm\nx.1.1.1. // size 13, in nghiêng; đánh chỉ mục tối đa 4 cấp\nx.2.\nx.2.1.\nx.2.1.1.\n....",
+        "chunk_index": 4,
+        "score": 0.063
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 2,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "................................................................................................................................",
+        "chunk_index": 5,
+        "score": -0.128
+      }
+    ],
+    "question_ctx": "tóm tắt tài liệu",
+    "answer_ctx": " Tài liệu \"TTTN\\_Mau9\\_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx\" có chi tiết như sau:\n\n- Lời mở đầu: Giới thiệu tên công ty thực tập, địa chỉ, email, số điện thoại, cơ sở vật chất, cơ cấu tổ chức, lĩnh vực hoạt động, sản phẩm quan trọng, đối tác, quy trình công việc và nhiệm vụ thực tập.\n\n- Chương 1: Giới thiệu chuyên gia hướng dẫn và những nội dung mà sinh viên cần học hỏi thêm khi thực tập tại doanh nghiệp.\n\n- Chương 2: Phần chính của báo cáo thực tập, sinh viên cần trình bày giải pháp và kết quả đạt được cho từng nội dung, cũng như phân tích, nhận định và quan sát cá nhân.\n\n- Chương 3: Kết quả thực tập, bao gồm bảng ghi nhận kết quả thực tập hàng tuần và bảng đánh giá quá trình thực tập tốt nghiệp (do chuyên gia doanh nghiệp đánh giá).\n\n- Chương 4: Kết luận và kiến nghị với doanh nghiệp và cơ sở đào tạo.\n\n- Phụ lục: Các quy trình, tài liệu của doanh nghiệp mà sinh viên đã trích dẫn trong quyển báo cáo thực tập tốt nghiệp.\n\n- Tham khảo: Danh sách các tài liệu tham khảo.\n\n- Mẫu 6 và 7: Bảng ghi nhận kết quả thực tập hàng tuần và bảng đánh giá quá trình thực tập tốt nghiệp.\n\n- Giấy chú thích: Nhận xét của chuyên gia doanh nghiệp.\n\n- Quy định trình bày: Chỉ dẫn về kiểu chữ, kích thước, đánh số trang, định dạng hình vẽ, bảng biểu và các công thức.\n\n[Nguồn 1: TTTN\\_Mau9\\_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 6]\n[Nguồn 2: TTTN\\_Mau9\\_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 5]\n[Nguồn 3: TTTN\\_Mau9\\_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 1]\n[Nguồn 4: TTTN\\_Mau9\\_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 7]\n[Nguồn 5: TTTN\\_Mau9\\_SINH",
+    "self_rag_meta": null,
+    "co_rag_meta": null,
+    "timestamp": 1782448088.6829453
+  },
+  {
+    "role": "user",
+    "content": "tóm tắt chương 2",
+    "sources": [],
+    "question_ctx": "",
+    "answer_ctx": "",
+    "self_rag_meta": null,
+    "co_rag_meta": null,
+    "timestamp": 1782448110.095283
+  },
+  {
+    "role": "assistant",
+    "content": " Chương 2 trong tài liệu \"TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx\" là phần chính của báo cáo thực tập tốt nghiệp. Sinh viên cần hoàn thành các nội dung được giao dựa theo đề cương học phần thực tập tốt nghiệp, với sự hướng dẫn của chuyên gia doanh nghiệp và hỗ trợ từ phía giảng viên hướng dẫn của cơ sở đào tạo. Trong quyển báo cáo, sinh viên cần trình bày giải pháp giải quyết từng nội dung và kết quả đạt được của từng nội dung. Nếu có thực nghiệm hoặc viết chương trình, sinh viên cũng cần trình bày kết quả thực nghiệm hoặc các giao diện của chương trình. Quyển báo cáo cũng cần có những phân tích, nhận định, quan sát cá nhân của sinh viên.\n\n[Nguồn: TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 5]",
+    "sources": [
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 6,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "....\nCHƯƠNG 3: KẾT QUẢ THỰC TẬP\nGhi nhận các kết quả cụ thể đã đạt được trong đợt thực tập\n(các bảng thông tin tiếp theo là để minh họa)\nBẢNG GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN\nSinh viên có thể trình bày chi tiết hơn các công việc đã làm trong mỗi tuần  (mẫu 6)\nCuối phần C này đính kèm là bảng GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN có chữ ký của chuyên gia hướng dẫn.\nBẢNG ĐÁNH GIÁ QUÁ TRÌNH THỰC TẬP TỐT NGHIỆP\n(Do chuyên gia doanh nghiệp đánh giá).  mẫu 7\nPHIẾU ĐÁNH GIÁ KẾT QUẢ THỰC TẬP TỐT NGHIỆP\n(Do giảng viên hướng dẫn đánh giá) mẫu 8\nKết luận chương 3\n....\nCHƯƠNG 4. KẾT LUẬN VÀ KIẾN NGHỊ\nNhững nội dung đã học hỏi được qua đợt thực tập; những kiến nghị về mặt khoa học liên quan đến quá trình thực tập tốt nghiệp\nMột số kiến nghị với doanh nghiệp, với cơ sở đào tạo để rút kinh nghiệm về công tác thực tập\nTÀI LIỆU THAM KHẢO\nTên tác giả, tên công trình, nhà xuất bản, năm xuất bản.\nTên tác giả, tên công trình, nhà xuất bản, năm xuất bản.\nPHỤ LỤC\nCác quy trình, tài liệu của doanh nghiệp mà sinh viên đã có trích dẫn trong quyển báo cáo thực tập tốt nghiệp (các tài liệu này cần được sự cho phép tiếp cận của doanh nghiệp thông qua chuyên gia doanh nghiệp hướng dẫn)\n(văn bản gốc nếu có)\nQuy định trình bày quyển báo cáo thực tập tốt nghiệp\nFont: Times New Roman\nĐóng bìa kiếng, in  khổ giấy A4, in 1 mặt\nCăn lề:\nLề trái: 3cm\nLề phải:2cm\nLề trên: 2cm\nLề dưới:2cm",
+        "chunk_index": 1,
+        "score": 0.3
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 5,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "LỜI MỞ ĐẦU\nCHƯƠNG 1. GIỚI THIỆU\nGiới thiệu công ty thực tập\nMột số thông tin gợi ý:\nTên công ty, địa chỉ, email, số điện thoại\nCơ sở vật chất của doanh nghiệp\nCơ cấu tổ chức của doanh nghiệp\nLĩnh vực hoạt động của doanh nghiệp\nCác sản phẩm quan trọng của doanh nghiệp\nCác đối tác hiện có của doanh nghiệp\nCác quy trình của doanh nghiệp (có thể chọn trình bày chi tiết một số quy trình phù hợp nhất với công việc dự kiến của sinh viên sau tốt nghiệp)\nSinh viên được phân công thực tập ở phòng ban nào của doanh nghiệp\nThông tin ngắn về chuyên gia của doanh nghiệp hướng dẫn trực tiếp.\nNhững nội dung mà sinh viên cần học hỏi thêm khi thực tập tại doanh nghiệp\nNhiệm vụ thực tập\nGhi rõ các công việc mà phía chuyên gia doanh nghiệp giao cho dựa theo đề cương chi tiết học phần thực tập tốt nghiệp\nTìm hiểu các quy trình công việc\nNghiên cứu một công nghệ mới\nTham gia vào một dự án của công ty,...\nKết luận chương 1\n....\nCHƯƠNG 2. TÊN CHƯƠNG ?\nĐây là phần chính của quyển báo cáo thực tập tốt nghiệp; với mỗi nội dung được giao, sinh viên cần hoàn thành dưới sự hướng dẫn của chuyên gia doanh nghiệp và sự hỗ trợ từ phía giảng viên hướng dẫn của cơ sở đào tạo.\nSinh viên cần trình bày trong quyển báo cáo này giải pháp giải quyết từng nội dung, kết quả đạt được của từng nội dung.\nNếu có thực nghiệm hoặc viết chương trình thì trình bày kết quả thực nghiệm hoặc các giao diện của chương trình kèm theo.\nQuyển báo cáo cần có những phân tích, nhận định, quan sát cá nhân của sinh viên.\nKết luận chương 2",
+        "chunk_index": 2,
+        "score": 0.235
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 7,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "Đánh số trang vào cuối giữa trang, trang 1 bắt đầu từ Lời mở đầu. Các trang trước đó đánh i, ii,iii,...trừ trang bìa và trang lót bìa không đánh số trang.\nGiãn dòng: Từ 1.3 đến 1.5 lines\nMục lục quyển báo cáo được đánh tự động\nCác hình vẽ, bảng biểu được đánh chỉ mục theo mỗi chương và phải có tiêu đề cho các bảng, hình vẽ, các công thức được đánh chỉ số (theo chương) ở bên phải.\nSinh viên chuyển cho 2 cán bộ hướng dẫn file PDF (1 file duy nhất chứa toàn bộ nội dung của quyển báo cáo thực tập tốt nghiệp).\nChương x: size 16, in đậm, chữ hoa\nx.1 // size 14, in đậm chữ hoa\nx.1.1.// size 13, in đậm\nx.1.1.1. // size 13, in nghiêng; đánh chỉ mục tối đa 4 cấp\nx.2.\nx.2.1.\nx.2.1.1.\n....",
+        "chunk_index": 3,
+        "score": 0.19
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 1,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "ỦY BAN NHÂN DÂN TP HỒ CHÍ MINH\nTRƯỜNG ĐẠI HỌC SÀI GÒN\nKHOA CÔNG NGHỆ THÔNG TIN\nHọ và tên sinh viên :\nBÁO CÁO\nTHỰC TẬP TỐT NGHIỆP\nCông ty thực tập\t\t:xxx\nChuyên gia hướng dẫn\t:xxx\nGiảng viên hướng dẫn\t:xxx\nTP. Hồ Chí Minh, tháng ….. năm 2018\nMỤC LỤC\nNHẬN XÉT CỦA CHUYÊN GIA DOANH NGHIỆP",
+        "chunk_index": 4,
+        "score": 0.078
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 3,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "NHẬN XÉT CỦA GIẢNG VIÊN HƯỚNG DẪN",
+        "chunk_index": 5,
+        "score": -0.208
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 2,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................",
+        "chunk_index": 6,
+        "score": -0.214
+      }
+    ],
+    "question_ctx": "tóm tắt chương 2",
+    "answer_ctx": " Chương 2 trong tài liệu \"TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx\" là phần chính của báo cáo thực tập tốt nghiệp. Sinh viên cần hoàn thành các nội dung được giao dựa theo đề cương học phần thực tập tốt nghiệp, với sự hướng dẫn của chuyên gia doanh nghiệp và hỗ trợ từ phía giảng viên hướng dẫn của cơ sở đào tạo. Trong quyển báo cáo, sinh viên cần trình bày giải pháp giải quyết từng nội dung và kết quả đạt được của từng nội dung. Nếu có thực nghiệm hoặc viết chương trình, sinh viên cũng cần trình bày kết quả thực nghiệm hoặc các giao diện của chương trình. Quyển báo cáo cũng cần có những phân tích, nhận định, quan sát cá nhân của sinh viên.\n\n[Nguồn: TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 5]",
+    "self_rag_meta": null,
+    "co_rag_meta": null,
+    "timestamp": 1782448116.7679493
+  },
+  {
+    "role": "user",
+    "content": "tóm tắt chương 3",
+    "sources": [],
+    "question_ctx": "",
+    "answer_ctx": "",
+    "self_rag_meta": null,
+    "co_rag_meta": null,
+    "timestamp": 1782448197.442249
+  },
+  {
+    "role": "assistant",
+    "content": " Chương 3 của tài liệu \"TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx\" được gọi là \"KẾT QUẢ THỰC TẬP\". Trong chương này, sinh viên ghi nhận các kết quả cụ thể đã đạt được trong đợt thực tập. Có hai bảng thông tin chi tiết được đính kèm: BẢNG GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN và BẢNG ĐÁNH GIÁ QUÁ TRÌNH THỰC TẬP TỐT NGHIỆP. Bảng đánh giá này được chuyên gia doanh nghiệp đánh giá. Phần này cũng bao gồm PHIẾU ĐÁNH GIÁ KẾT QUẢ THỰC TẬP TỐT NGHIỆP, đánh giá bởi giảng viên hướng dẫn. Chương 3 kết thúc với kết luận.\n\n[Nguồn 1: TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 6]",
+    "sources": [
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 6,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "....\nCHƯƠNG 3: KẾT QUẢ THỰC TẬP\nGhi nhận các kết quả cụ thể đã đạt được trong đợt thực tập\n(các bảng thông tin tiếp theo là để minh họa)\nBẢNG GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN\nSinh viên có thể trình bày chi tiết hơn các công việc đã làm trong mỗi tuần  (mẫu 6)\nCuối phần C này đính kèm là bảng GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN có chữ ký của chuyên gia hướng dẫn.\nBẢNG ĐÁNH GIÁ QUÁ TRÌNH THỰC TẬP TỐT NGHIỆP\n(Do chuyên gia doanh nghiệp đánh giá).  mẫu 7\nPHIẾU ĐÁNH GIÁ KẾT QUẢ THỰC TẬP TỐT NGHIỆP\n(Do giảng viên hướng dẫn đánh giá) mẫu 8\nKết luận chương 3\n....\nCHƯƠNG 4. KẾT LUẬN VÀ KIẾN NGHỊ\nNhững nội dung đã học hỏi được qua đợt thực tập; những kiến nghị về mặt khoa học liên quan đến quá trình thực tập tốt nghiệp\nMột số kiến nghị với doanh nghiệp, với cơ sở đào tạo để rút kinh nghiệm về công tác thực tập\nTÀI LIỆU THAM KHẢO\nTên tác giả, tên công trình, nhà xuất bản, năm xuất bản.\nTên tác giả, tên công trình, nhà xuất bản, năm xuất bản.\nPHỤ LỤC\nCác quy trình, tài liệu của doanh nghiệp mà sinh viên đã có trích dẫn trong quyển báo cáo thực tập tốt nghiệp (các tài liệu này cần được sự cho phép tiếp cận của doanh nghiệp thông qua chuyên gia doanh nghiệp hướng dẫn)\n(văn bản gốc nếu có)\nQuy định trình bày quyển báo cáo thực tập tốt nghiệp\nFont: Times New Roman\nĐóng bìa kiếng, in  khổ giấy A4, in 1 mặt\nCăn lề:\nLề trái: 3cm\nLề phải:2cm\nLề trên: 2cm\nLề dưới:2cm",
+        "chunk_index": 1,
+        "score": 0.351
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 5,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "LỜI MỞ ĐẦU\nCHƯƠNG 1. GIỚI THIỆU\nGiới thiệu công ty thực tập\nMột số thông tin gợi ý:\nTên công ty, địa chỉ, email, số điện thoại\nCơ sở vật chất của doanh nghiệp\nCơ cấu tổ chức của doanh nghiệp\nLĩnh vực hoạt động của doanh nghiệp\nCác sản phẩm quan trọng của doanh nghiệp\nCác đối tác hiện có của doanh nghiệp\nCác quy trình của doanh nghiệp (có thể chọn trình bày chi tiết một số quy trình phù hợp nhất với công việc dự kiến của sinh viên sau tốt nghiệp)\nSinh viên được phân công thực tập ở phòng ban nào của doanh nghiệp\nThông tin ngắn về chuyên gia của doanh nghiệp hướng dẫn trực tiếp.\nNhững nội dung mà sinh viên cần học hỏi thêm khi thực tập tại doanh nghiệp\nNhiệm vụ thực tập\nGhi rõ các công việc mà phía chuyên gia doanh nghiệp giao cho dựa theo đề cương chi tiết học phần thực tập tốt nghiệp\nTìm hiểu các quy trình công việc\nNghiên cứu một công nghệ mới\nTham gia vào một dự án của công ty,...\nKết luận chương 1\n....\nCHƯƠNG 2. TÊN CHƯƠNG ?\nĐây là phần chính của quyển báo cáo thực tập tốt nghiệp; với mỗi nội dung được giao, sinh viên cần hoàn thành dưới sự hướng dẫn của chuyên gia doanh nghiệp và sự hỗ trợ từ phía giảng viên hướng dẫn của cơ sở đào tạo.\nSinh viên cần trình bày trong quyển báo cáo này giải pháp giải quyết từng nội dung, kết quả đạt được của từng nội dung.\nNếu có thực nghiệm hoặc viết chương trình thì trình bày kết quả thực nghiệm hoặc các giao diện của chương trình kèm theo.\nQuyển báo cáo cần có những phân tích, nhận định, quan sát cá nhân của sinh viên.\nKết luận chương 2",
+        "chunk_index": 2,
+        "score": 0.333
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 7,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "Đánh số trang vào cuối giữa trang, trang 1 bắt đầu từ Lời mở đầu. Các trang trước đó đánh i, ii,iii,...trừ trang bìa và trang lót bìa không đánh số trang.\nGiãn dòng: Từ 1.3 đến 1.5 lines\nMục lục quyển báo cáo được đánh tự động\nCác hình vẽ, bảng biểu được đánh chỉ mục theo mỗi chương và phải có tiêu đề cho các bảng, hình vẽ, các công thức được đánh chỉ số (theo chương) ở bên phải.\nSinh viên chuyển cho 2 cán bộ hướng dẫn file PDF (1 file duy nhất chứa toàn bộ nội dung của quyển báo cáo thực tập tốt nghiệp).\nChương x: size 16, in đậm, chữ hoa\nx.1 // size 14, in đậm chữ hoa\nx.1.1.// size 13, in đậm\nx.1.1.1. // size 13, in nghiêng; đánh chỉ mục tối đa 4 cấp\nx.2.\nx.2.1.\nx.2.1.1.\n....",
+        "chunk_index": 3,
+        "score": 0.179
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 1,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "ỦY BAN NHÂN DÂN TP HỒ CHÍ MINH\nTRƯỜNG ĐẠI HỌC SÀI GÒN\nKHOA CÔNG NGHỆ THÔNG TIN\nHọ và tên sinh viên :\nBÁO CÁO\nTHỰC TẬP TỐT NGHIỆP\nCông ty thực tập\t\t:xxx\nChuyên gia hướng dẫn\t:xxx\nGiảng viên hướng dẫn\t:xxx\nTP. Hồ Chí Minh, tháng ….. năm 2018\nMỤC LỤC\nNHẬN XÉT CỦA CHUYÊN GIA DOANH NGHIỆP",
+        "chunk_index": 4,
+        "score": 0.129
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 2,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "................................................................................................................................",
+        "chunk_index": 5,
+        "score": -0.163
+      }
+    ],
+    "question_ctx": "tóm tắt chương 3",
+    "answer_ctx": " Chương 3 của tài liệu \"TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx\" được gọi là \"KẾT QUẢ THỰC TẬP\". Trong chương này, sinh viên ghi nhận các kết quả cụ thể đã đạt được trong đợt thực tập. Có hai bảng thông tin chi tiết được đính kèm: BẢNG GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN và BẢNG ĐÁNH GIÁ QUÁ TRÌNH THỰC TẬP TỐT NGHIỆP. Bảng đánh giá này được chuyên gia doanh nghiệp đánh giá. Phần này cũng bao gồm PHIẾU ĐÁNH GIÁ KẾT QUẢ THỰC TẬP TỐT NGHIỆP, đánh giá bởi giảng viên hướng dẫn. Chương 3 kết thúc với kết luận.\n\n[Nguồn 1: TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 6]",
+    "self_rag_meta": null,
+    "co_rag_meta": null,
+    "timestamp": 1782448204.7196846
+  },
+  {
+    "role": "user",
+    "content": "tóm tắt chương 4",
+    "sources": [],
+    "question_ctx": "",
+    "answer_ctx": "",
+    "self_rag_meta": null,
+    "co_rag_meta": null,
+    "timestamp": 1782448398.226919
+  },
+  {
+    "role": "assistant",
+    "content": " Chương 4 của tài liệu \"TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx\" được gọi là \"KẾT LUẬN VÀ KIẾN NGHỊ\". Trong chương này, sinh viên trình bày những nội dung đã học hỏi được qua đợt thực tập và những kiến nghị về mặt khoa học liên quan đến quá trình thực tập tốt nghiệp. Sinh viên cũng cung cấp một số kiến nghị với doanh nghiệp và với cơ sở đào tạo để rút kinh nghiệm về công tác thực tập. Chương 4 kết thúc với danh sách các tài liệu tham khảo.\n\n[Nguồn: TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 6]",
+    "sources": [
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 6,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "....\nCHƯƠNG 3: KẾT QUẢ THỰC TẬP\nGhi nhận các kết quả cụ thể đã đạt được trong đợt thực tập\n(các bảng thông tin tiếp theo là để minh họa)\nBẢNG GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN\nSinh viên có thể trình bày chi tiết hơn các công việc đã làm trong mỗi tuần  (mẫu 6)\nCuối phần C này đính kèm là bảng GHI NHẬN KẾT QUẢ THỰC TẬP HÀNG TUẦN có chữ ký của chuyên gia hướng dẫn.\nBẢNG ĐÁNH GIÁ QUÁ TRÌNH THỰC TẬP TỐT NGHIỆP\n(Do chuyên gia doanh nghiệp đánh giá).  mẫu 7\nPHIẾU ĐÁNH GIÁ KẾT QUẢ THỰC TẬP TỐT NGHIỆP\n(Do giảng viên hướng dẫn đánh giá) mẫu 8\nKết luận chương 3\n....\nCHƯƠNG 4. KẾT LUẬN VÀ KIẾN NGHỊ\nNhững nội dung đã học hỏi được qua đợt thực tập; những kiến nghị về mặt khoa học liên quan đến quá trình thực tập tốt nghiệp\nMột số kiến nghị với doanh nghiệp, với cơ sở đào tạo để rút kinh nghiệm về công tác thực tập\nTÀI LIỆU THAM KHẢO\nTên tác giả, tên công trình, nhà xuất bản, năm xuất bản.\nTên tác giả, tên công trình, nhà xuất bản, năm xuất bản.\nPHỤ LỤC\nCác quy trình, tài liệu của doanh nghiệp mà sinh viên đã có trích dẫn trong quyển báo cáo thực tập tốt nghiệp (các tài liệu này cần được sự cho phép tiếp cận của doanh nghiệp thông qua chuyên gia doanh nghiệp hướng dẫn)\n(văn bản gốc nếu có)\nQuy định trình bày quyển báo cáo thực tập tốt nghiệp\nFont: Times New Roman\nĐóng bìa kiếng, in  khổ giấy A4, in 1 mặt\nCăn lề:\nLề trái: 3cm\nLề phải:2cm\nLề trên: 2cm\nLề dưới:2cm",
+        "chunk_index": 1,
+        "score": 0.273
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 5,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "LỜI MỞ ĐẦU\nCHƯƠNG 1. GIỚI THIỆU\nGiới thiệu công ty thực tập\nMột số thông tin gợi ý:\nTên công ty, địa chỉ, email, số điện thoại\nCơ sở vật chất của doanh nghiệp\nCơ cấu tổ chức của doanh nghiệp\nLĩnh vực hoạt động của doanh nghiệp\nCác sản phẩm quan trọng của doanh nghiệp\nCác đối tác hiện có của doanh nghiệp\nCác quy trình của doanh nghiệp (có thể chọn trình bày chi tiết một số quy trình phù hợp nhất với công việc dự kiến của sinh viên sau tốt nghiệp)\nSinh viên được phân công thực tập ở phòng ban nào của doanh nghiệp\nThông tin ngắn về chuyên gia của doanh nghiệp hướng dẫn trực tiếp.\nNhững nội dung mà sinh viên cần học hỏi thêm khi thực tập tại doanh nghiệp\nNhiệm vụ thực tập\nGhi rõ các công việc mà phía chuyên gia doanh nghiệp giao cho dựa theo đề cương chi tiết học phần thực tập tốt nghiệp\nTìm hiểu các quy trình công việc\nNghiên cứu một công nghệ mới\nTham gia vào một dự án của công ty,...\nKết luận chương 1\n....\nCHƯƠNG 2. TÊN CHƯƠNG ?\nĐây là phần chính của quyển báo cáo thực tập tốt nghiệp; với mỗi nội dung được giao, sinh viên cần hoàn thành dưới sự hướng dẫn của chuyên gia doanh nghiệp và sự hỗ trợ từ phía giảng viên hướng dẫn của cơ sở đào tạo.\nSinh viên cần trình bày trong quyển báo cáo này giải pháp giải quyết từng nội dung, kết quả đạt được của từng nội dung.\nNếu có thực nghiệm hoặc viết chương trình thì trình bày kết quả thực nghiệm hoặc các giao diện của chương trình kèm theo.\nQuyển báo cáo cần có những phân tích, nhận định, quan sát cá nhân của sinh viên.\nKết luận chương 2",
+        "chunk_index": 2,
+        "score": 0.195
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 7,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "Đánh số trang vào cuối giữa trang, trang 1 bắt đầu từ Lời mở đầu. Các trang trước đó đánh i, ii,iii,...trừ trang bìa và trang lót bìa không đánh số trang.\nGiãn dòng: Từ 1.3 đến 1.5 lines\nMục lục quyển báo cáo được đánh tự động\nCác hình vẽ, bảng biểu được đánh chỉ mục theo mỗi chương và phải có tiêu đề cho các bảng, hình vẽ, các công thức được đánh chỉ số (theo chương) ở bên phải.\nSinh viên chuyển cho 2 cán bộ hướng dẫn file PDF (1 file duy nhất chứa toàn bộ nội dung của quyển báo cáo thực tập tốt nghiệp).\nChương x: size 16, in đậm, chữ hoa\nx.1 // size 14, in đậm chữ hoa\nx.1.1.// size 13, in đậm\nx.1.1.1. // size 13, in nghiêng; đánh chỉ mục tối đa 4 cấp\nx.2.\nx.2.1.\nx.2.1.1.\n....",
+        "chunk_index": 3,
+        "score": 0.138
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 1,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "ỦY BAN NHÂN DÂN TP HỒ CHÍ MINH\nTRƯỜNG ĐẠI HỌC SÀI GÒN\nKHOA CÔNG NGHỆ THÔNG TIN\nHọ và tên sinh viên :\nBÁO CÁO\nTHỰC TẬP TỐT NGHIỆP\nCông ty thực tập\t\t:xxx\nChuyên gia hướng dẫn\t:xxx\nGiảng viên hướng dẫn\t:xxx\nTP. Hồ Chí Minh, tháng ….. năm 2018\nMỤC LỤC\nNHẬN XÉT CỦA CHUYÊN GIA DOANH NGHIỆP",
+        "chunk_index": 4,
+        "score": 0.108
+      },
+      {
+        "file": "TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx",
+        "page": 2,
+        "total_pages": 7,
+        "file_type": "docx",
+        "content": "................................................................................................................................",
+        "chunk_index": 5,
+        "score": -0.166
+      }
+    ],
+    "question_ctx": "tóm tắt chương 4",
+    "answer_ctx": " Chương 4 của tài liệu \"TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx\" được gọi là \"KẾT LUẬN VÀ KIẾN NGHỊ\". Trong chương này, sinh viên trình bày những nội dung đã học hỏi được qua đợt thực tập và những kiến nghị về mặt khoa học liên quan đến quá trình thực tập tốt nghiệp. Sinh viên cũng cung cấp một số kiến nghị với doanh nghiệp và với cơ sở đào tạo để rút kinh nghiệm về công tác thực tập. Chương 4 kết thúc với danh sách các tài liệu tham khảo.\n\n[Nguồn: TTTN_Mau9_SINHVIENtrinhbaybaocaothuctaptotnghiep.docx - Trang 6]",
+    "self_rag_meta": null,
+    "co_rag_meta": null,
+    "timestamp": 1782448403.7223434
+  }
+]

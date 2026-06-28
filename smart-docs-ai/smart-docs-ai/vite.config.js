@@ -14,6 +14,14 @@ export default defineConfig({
       // Bỏ qua file db.json (tránh dẫn đến tình trạng web tự động reload khi file db.json thay đổi)
       // Ví dụ: nếu file nằm ở server/db.json
       ignored: ['**/db.json', '**/db/**']
+    },
+    proxy: {
+      '/api': {
+        target: 'https://d60866voq5.execute-api.us-east-1.amazonaws.com/prod',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path,
+      }
     }
   },
   resolve: {

@@ -120,6 +120,30 @@ export const clearChatHistory = createAsyncThunk(
   }
 );
 
+export const fetchProcessedFiles = createAsyncThunk(
+  "smartdoc/fetchProcessedFiles",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await smartdocService.getDocuments();
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.message || "Không thể tải danh sách tài liệu");
+    }
+  }
+);
+
+export const fetchChatHistory = createAsyncThunk(
+  "smartdoc/fetchChatHistory",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await smartdocService.getChatHistory();
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.message || "Không thể tải lịch sử chat");
+    }
+  }
+);
+
 // ─── Slice ────────────────────────────────────────────────────────────────────
 const smartdocSlice = createSlice({
   name: "smartdoc",
@@ -206,16 +230,16 @@ const smartdocSlice = createSlice({
       })
       .addCase(sendMessage.fulfilled, (state, action) => {
         state.isChatLoading = false;
-        const { answer, sources, search_mode, self_rag_meta, co_rag_meta, question } = action.payload;
+        const { content, answer, sources, search_mode, self_rag_meta, co_rag_meta, question_ctx, question } = action.payload;
         // Ghi đè user message cuối (đã add optimistic) và thêm assistant message
         state.chatHistory.push({
           role: "assistant",
-          content: answer,
+          content: content || answer,
           sources: sources || [],
           searchMode: search_mode,
           selfRagMeta: self_rag_meta,
           coRagMeta: co_rag_meta,
-          questionCtx: question,
+          questionCtx: question_ctx || question,
         });
       })
       .addCase(sendMessage.rejected, (state, action) => {
@@ -230,6 +254,26 @@ const smartdocSlice = createSlice({
       // ── Clear Chat History ──
       .addCase(clearChatHistory.fulfilled, (state) => {
         state.chatHistory = [];
+      })
+
+      // ── Fetch Processed Files ──
+      .addCase(fetchProcessedFiles.fulfilled, (state, action) => {
+        state.processedFiles = action.payload || [];
+        state.totalChunks = state.processedFiles.reduce((sum, f) => sum + (f.chunks || 0), 0);
+      })
+
+      // ── Fetch Chat History ──
+      .addCase(fetchChatHistory.fulfilled, (state, action) => {
+        state.chatHistory = (action.payload || []).map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          sources: msg.sources || [],
+          searchMode: msg.search_mode,
+          selfRagMeta: msg.self_rag_meta,
+          coRagMeta: msg.co_rag_meta,
+          questionCtx: msg.question_ctx,
+          timestamp: msg.timestamp
+        }));
       });
   },
 });
