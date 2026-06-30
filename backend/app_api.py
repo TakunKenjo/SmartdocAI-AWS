@@ -1,5 +1,12 @@
 import os
 import sys
+
+# Thiết lập biến môi trường Hugging Face để trỏ đến model được tải sẵn trong image
+os.environ["HF_HOME"] = "/var/task/hf_cache"
+os.environ["TRANSFORMERS_CACHE"] = "/var/task/hf_cache"
+os.environ["HF_HUB_OFFLINE"] = "1"
+
+
 import json
 import logging
 import tempfile
@@ -224,6 +231,9 @@ def get_chat_history():
 
 
 def get_vector_store() -> Optional[Any]:
+    # Lấy danh sách file hiện tại trong memory trước khi cập nhật
+    current_names = [f["name"] for f in state.get("processed_files", [])]
+
     # Luôn lấy danh sách file mới nhất từ S3/disk để đồng bộ hóa
     latest_files = get_processed_files()
     
@@ -232,14 +242,15 @@ def get_vector_store() -> Optional[Any]:
         state["raw_documents"] = []
         return None
         
-    # So sánh với danh sách file trong memory để phát hiện sự thay đổi (upload mới)
-    current_names = [f["name"] for f in state.get("processed_files", [])]
     latest_names = [f["name"] for f in latest_files]
     
-    if state["vector_store"] is None or current_names != latest_names:
+    # Nếu danh sách file thay đổi, chúng ta cần download lại vector store từ S3 (force_download=True)
+    has_changed = (current_names != latest_names)
+    
+    if state["vector_store"] is None or has_changed:
         from modules.vector_store import load_vector_store
-        logger.info("Đang tải hoặc cập nhật vector store từ disk/S3...")
-        saved_store = load_vector_store()
+        logger.info(f"Đang tải hoặc cập nhật vector store từ disk/S3 (force={has_changed})...")
+        saved_store = load_vector_store(force_download=has_changed)
         if saved_store is not None:
             state["vector_store"] = saved_store
             logger.info("Đã khôi phục vector store thành công.")
@@ -711,12 +722,22 @@ def clear_history():
     global _history_loaded
     state["chat_history"] = []
     _history_loaded = True
+    
+    # Xóa local copy
     try:
         if os.path.exists(_HISTORY_PATH):
             os.remove(_HISTORY_PATH)
     except Exception as e:
-        logger.error(f"Lỗi khi xóa chat_history: {e}")
-        raise HTTPException(status_code=500, detail=f"Không thể xóa file lịch sử: {e}")
+        logger.error(f"Lỗi khi xóa chat_history local: {e}")
+        
+    # Xóa trên S3 để đồng bộ hóa serverless
+    if config.IS_LAMBDA:
+        try:
+            s3_storage.delete_key(config.S3_KEY_CHAT_HISTORY)
+        except Exception as e:
+            logger.error(f"Lỗi khi xóa chat_history trên S3: {e}")
+            raise HTTPException(status_code=500, detail=f"Không thể xóa file lịch sử trên S3: {e}")
+            
     return {"status": "success"}
 
 
@@ -725,13 +746,21 @@ def clear_documents():
     from modules.vector_store import clear_vector_store
     clear_vector_store()
     
-    # Xóa file persist
+    # Xóa file persist local
     for path in [_FILES_PATH, _HISTORY_PATH, _CONFIG_PATH]:
         try:
             if os.path.exists(path):
                 os.remove(path)
         except Exception as e:
-            logger.error(f"Lỗi khi xóa {path}: {e}")
+            logger.error(f"Lỗi khi xóa {path} local: {e}")
+
+    # Xóa file persist trên S3 để đồng bộ hóa serverless
+    if config.IS_LAMBDA:
+        for s3_key in [config.S3_KEY_PROCESSED_FILES, config.S3_KEY_CHAT_HISTORY, config.S3_KEY_SEARCH_CONFIG]:
+            try:
+                s3_storage.delete_key(s3_key)
+            except Exception as e:
+                logger.error(f"Lỗi khi xóa {s3_key} trên S3: {e}")
 
     global _files_loaded, _history_loaded
     _files_loaded = True

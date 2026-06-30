@@ -70,14 +70,20 @@ def save_vector_store(vector_store: Any, index_name: Optional[str] = None):
         raise
 
 
-def load_vector_store(index_name: Optional[str] = None) -> Optional[Any]:
+def load_vector_store(index_name: Optional[str] = None, force_download: bool = False) -> Optional[Any]:
     _index_name = index_name or config.FAISS_INDEX_NAME
     load_path = os.path.join(config.VECTORSTORE_DIR, _index_name)
 
-    # Nếu chạy trên Lambda và chưa có local copy, thử tải từ S3
-    if not os.path.exists(load_path) and config.IS_LAMBDA:
-        logger.info(f"Vector store chưa có local, thử tải từ S3...")
-        s3_storage.download_vectorstore(load_path, _index_name)
+    # Nếu chạy trên Lambda, tải từ S3 nếu chưa có local copy hoặc có yêu cầu force_download
+    if config.IS_LAMBDA:
+        if force_download or not os.path.exists(load_path):
+            logger.info(f"Đang tải vector store từ S3 (force={force_download})...")
+            if os.path.exists(load_path):
+                try:
+                    shutil.rmtree(load_path)
+                except Exception as e:
+                    logger.warning(f"Không thể xóa thư mục vector store local cũ: {e}")
+            s3_storage.download_vectorstore(load_path, _index_name)
 
     if not os.path.exists(load_path):
         logger.info("Chưa có vector store được lưu trước đó.")
