@@ -236,6 +236,7 @@ def ask_question(
     retriever=None,
     file_filter: Optional[list] = None,
     forced_docs: Optional[list] = None,
+    raw_documents: Optional[list] = None,
 ) -> Dict[str, Any]:
     result = {
         "answer": "",
@@ -281,27 +282,60 @@ def ask_question(
             })
             result["answer"] = response.content
         else:
-            search_question = _reformulate_question(question, chat_history, llm)
-            if retriever is not None:
-                doc_score_pairs = _compute_rrf_scores(retriever, search_question)
+            # Phát hiện câu hỏi tóm tắt để lấy toàn bộ các chunk theo thứ tự
+            is_summary = False
+            summary_keywords = ["tóm tắt", "summary", "summarize", "khái quát", "sơ lược", "tổng hợp", "overview"]
+            if any(kw in question.lower() for kw in summary_keywords):
+                is_summary = True
+
+            if is_summary and raw_documents:
+                logger.info("Phát hiện yêu cầu tóm tắt. Đang nạp tất cả các chunks theo thứ tự trang...")
+                if file_filter:
+                    filtered_docs = [
+                        doc for doc in raw_documents
+                        if any(f in doc.metadata.get("source", "") for f in file_filter)
+                    ]
+                else:
+                    filtered_docs = raw_documents
+                
+                # Sắp xếp theo trang
+                try:
+                    filtered_docs = sorted(
+                        filtered_docs,
+                        key=lambda d: (
+                            d.metadata.get("source", ""),
+                            int(d.metadata.get("page", 0))
+                        )
+                    )
+                except Exception as e:
+                    logger.warning(f"Lỗi khi sắp xếp chunks: {e}")
+                
+                # Giới hạn tối đa 25 chunks để không bị tràn context window
+                relevant_docs = filtered_docs[:25]
+                doc_score_pairs = [(doc, 1.0) for doc in relevant_docs]
             else:
-                doc_score_pairs = similarity_search_with_scores(vector_store, search_question)
+                search_question = _reformulate_question(question, chat_history, llm)
+                if retriever is not None:
+                    doc_score_pairs = _compute_rrf_scores(retriever, search_question)
+                else:
+                    doc_score_pairs = similarity_search_with_scores(vector_store, search_question)
 
-            if forced_docs:
-                existing_keys = {d.page_content[:120] for d, _ in doc_score_pairs}
-                injected = [
-                    (doc, 1.0) for doc in forced_docs
-                    if doc.page_content[:120] not in existing_keys
-                ]
-                if injected:
-                    logger.info(f"Injected {len(injected)} forced docs by question number scan.")
-                doc_score_pairs = injected + list(doc_score_pairs)
+                if forced_docs:
+                    existing_keys = {d.page_content[:120] for d, _ in doc_score_pairs}
+                    injected = [
+                        (doc, 1.0) for doc in forced_docs
+                        if doc.page_content[:120] not in existing_keys
+                    ]
+                    if injected:
+                        logger.info(f"Injected {len(injected)} forced docs by question number scan.")
+                    doc_score_pairs = injected + list(doc_score_pairs)
 
-            if file_filter:
-                doc_score_pairs = [
-                    (doc, score) for doc, score in doc_score_pairs
-                    if any(f in doc.metadata.get("source", "") for f in file_filter)
-                ]
+                if file_filter:
+                    doc_score_pairs = [
+                        (doc, score) for doc, score in doc_score_pairs
+                        if any(f in doc.metadata.get("source", "") for f in file_filter)
+                    ]
+            
             relevant_docs = [doc for doc, _ in doc_score_pairs]
             context = format_context(relevant_docs)
 

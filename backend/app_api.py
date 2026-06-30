@@ -34,7 +34,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger("SmartDocAI_API")
+
 
 app = FastAPI(
     title="SmartDocAI API",
@@ -612,6 +614,7 @@ async def chat_endpoint(request: ChatRequest):
                 retriever=retriever,
                 file_filter=state["active_file_filter"],
                 forced_docs=forced_docs if forced_docs else None,
+                raw_documents=state["raw_documents"],
             )
 
             # Reranking
