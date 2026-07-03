@@ -289,7 +289,7 @@ def ask_question(
                 is_summary = True
 
             if is_summary and raw_documents:
-                logger.info("Phát hiện yêu cầu tóm tắt. Đang nạp tất cả các chunks theo thứ tự trang...")
+                logger.info("Phát hiện yêu cầu tóm tắt. Đang chọn 12 chunks trải dài toàn bộ tài liệu...")
                 if file_filter:
                     filtered_docs = [
                         doc for doc in raw_documents
@@ -297,8 +297,7 @@ def ask_question(
                     ]
                 else:
                     filtered_docs = raw_documents
-                
-                # Sắp xếp theo trang
+
                 try:
                     filtered_docs = sorted(
                         filtered_docs,
@@ -309,9 +308,15 @@ def ask_question(
                     )
                 except Exception as e:
                     logger.warning(f"Lỗi khi sắp xếp chunks: {e}")
-                
-                # Giới hạn tối đa 25 chunks để không bị tràn context window
-                relevant_docs = filtered_docs[:25]
+
+                total_count = len(filtered_docs)
+                if total_count <= 12:
+                    relevant_docs = filtered_docs
+                else:
+                    step = total_count / 12
+                    indices = [int(i * step) for i in range(12)]
+                    relevant_docs = [filtered_docs[idx] for idx in indices]
+
                 doc_score_pairs = [(doc, 1.0) for doc in relevant_docs]
             else:
                 search_question = _reformulate_question(question, chat_history, llm)

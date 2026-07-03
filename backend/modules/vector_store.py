@@ -15,19 +15,38 @@ logger = logging.getLogger(__name__)
 _embedding_model = None
 
 
+from concurrent.futures import ThreadPoolExecutor
+
+class ParallelBedrockEmbeddings:
+    def __init__(self, model_id: str, region_name: str, max_workers: int = 12):
+        from langchain_aws import BedrockEmbeddings
+        self.base_embeddings = BedrockEmbeddings(
+            model_id=model_id,
+            region_name=region_name,
+        )
+        self.max_workers = max_workers
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        if not texts:
+            return []
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            return list(executor.map(self.base_embeddings.embed_query, texts))
+
+    def embed_query(self, text: str) -> List[float]:
+        return self.base_embeddings.embed_query(text)
+
+
 def get_embedding_model() -> Any:
     global _embedding_model
 
     if _embedding_model is None:
-        from langchain_huggingface import HuggingFaceEmbeddings
-        logger.info(f"Đang tải embedding model: {config.EMBEDDING_MODEL}...")
-        logger.info("Nếu đây là lần đầu, quá trình tải có thể mất vài phút (~470 MB).")
-        _embedding_model = HuggingFaceEmbeddings(
-            model_name=config.EMBEDDING_MODEL,
-            model_kwargs={"device": config.EMBEDDING_DEVICE},
-            encode_kwargs={"normalize_embeddings": True},
+        logger.info(f"Khởi tạo Bedrock Embedding model đa luồng: {config.EMBEDDING_MODEL}")
+        _embedding_model = ParallelBedrockEmbeddings(
+            model_id=config.EMBEDDING_MODEL,
+            region_name=config.AWS_DEFAULT_REGION,
+            max_workers=12
         )
-        logger.info("Đã tải embedding model thành công!")
+        logger.info("Đã khởi tạo Parallel Bedrock Embedding model thành công!")
 
     return _embedding_model
 

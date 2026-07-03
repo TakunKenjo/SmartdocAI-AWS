@@ -78,13 +78,29 @@ export const uploadDocuments = createAsyncThunk(
   "smartdoc/uploadDocuments",
   async ({ files, chunkSize, chunkOverlap }, { rejectWithValue }) => {
     try {
-      const res = await smartdocService.uploadDocuments(files, chunkSize, chunkOverlap);
-      return res.data;
+      const fileList = Array.from(files);
+      let lastProcessedFiles = [];
+
+      for (const file of fileList) {
+        // 1. Get Presigned S3 URL
+        const contentType = file.type || "application/octet-stream";
+        const { upload_url, s3_key, filename } = await smartdocService.getUploadUrl(file.name, contentType);
+        
+        // 2. Upload file directly to S3
+        await smartdocService.uploadFileToS3(upload_url, file);
+
+        // 3. Trigger document processing in backend
+        const res = await smartdocService.processDocument(filename, s3_key, chunkSize, chunkOverlap);
+        lastProcessedFiles = res.data;
+      }
+
+      return lastProcessedFiles;
     } catch (err) {
-      return rejectWithValue(err?.response?.data?.message || err?.message || "Upload thất bại!");
+      return rejectWithValue(err?.response?.data?.message || err?.message || "Xử lý tài liệu thất bại!");
     }
   }
 );
+
 
 export const clearDocuments = createAsyncThunk(
   "smartdoc/clearDocuments",

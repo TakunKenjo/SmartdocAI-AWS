@@ -14,7 +14,7 @@ import time
 import shutil
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
@@ -364,7 +364,16 @@ class ChatRequest(BaseModel):
     coRagAgentConceptual: Optional[bool] = None
     activeFileFilter: Optional[List[str]] = None
 
-# --- API ENDPOINTS ---
+class UploadUrlRequest(BaseModel):
+    filename: str
+    content_type: Optional[str] = "application/octet-stream"
+
+class ProcessDocumentRequest(BaseModel):
+    filename: str
+    s3_key: str
+    chunk_size: Optional[int] = None
+    chunk_overlap: Optional[int] = None
+
 
 @app.get("/api/status")
 def get_status():
@@ -377,8 +386,10 @@ def get_status():
         "embedding_model": config.EMBEDDING_MODEL,
         "total_files": len(processed_files),
         "total_pages": sum(f.get("pages", 0) for f in processed_files),
-        "total_chunks": state["total_chunks"]
+        "total_chunks": state["total_chunks"],
+        "model_ready": True
     }
+
 
 
 @app.get("/api/config")
@@ -415,6 +426,100 @@ def update_config(data: ConfigUpdate):
 @app.get("/api/files")
 def get_files():
     return get_processed_files()
+
+@app.post("/api/upload-url")
+def get_upload_url(data: UploadUrlRequest):
+    if not data.filename:
+        raise HTTPException(status_code=400, detail="Filename là bắt buộc.")
+    
+    clean_filename = os.path.basename(data.filename)
+    s3_key = f"uploads/{clean_filename}"
+    upload_url = s3_storage.generate_presigned_upload_url(s3_key, data.content_type)
+    
+    if not upload_url:
+        raise HTTPException(status_code=500, detail="Không thể tạo presigned URL từ S3.")
+        
+    return {
+        "status": "success",
+        "upload_url": upload_url,
+        "s3_key": s3_key,
+        "filename": clean_filename
+    }
+
+
+@app.post("/api/process")
+def process_document(data: ProcessDocumentRequest):
+    from modules.vector_store import clear_vector_store, create_vector_store, save_vector_store, create_bm25_retriever
+    from modules.document_processor import extract_text_from_pdf, extract_text_from_docx, split_documents
+
+    if not data.filename or not data.s3_key:
+        raise HTTPException(status_code=400, detail="Filename và s3_key là bắt buộc.")
+
+    if data.chunk_size is not None:
+        state["chunk_size"] = data.chunk_size
+    if data.chunk_overlap is not None:
+        state["chunk_overlap"] = data.chunk_overlap
+
+    file_ext = os.path.splitext(data.filename)[1].lower()
+    if file_ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Định dạng {file_ext} không được hỗ trợ.")
+
+    local_file_path = os.path.join(tempfile.gettempdir(), "uploads", data.filename)
+    os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+
+    if config.IS_LAMBDA or not os.path.exists(local_file_path):
+        success = s3_storage.download_file(data.s3_key, local_file_path)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy file {data.s3_key} trên S3.")
+
+    clear_vector_store()
+    state["vector_store"] = None
+    state["raw_documents"] = []
+    state["processed_files"] = []
+    state["total_chunks"] = 0
+
+    global _files_loaded
+    _files_loaded = True
+
+    if file_ext == ".docx":
+        raw_docs = extract_text_from_docx(local_file_path, source_name=data.filename)
+    else:
+        raw_docs = extract_text_from_pdf(local_file_path, source_name=data.filename)
+
+    if not raw_docs:
+        raise HTTPException(status_code=400, detail=f"File {data.filename} không chứa chữ.")
+
+    file_chunks = split_documents(
+        raw_docs,
+        chunk_size=state["chunk_size"],
+        chunk_overlap=state["chunk_overlap"]
+    )
+
+    if file_chunks:
+        state["raw_documents"].extend(file_chunks)
+        state["processed_files"].append({
+            "name": data.filename,
+            "chunks": len(file_chunks),
+            "pages": len(raw_docs),
+            "s3_key": data.s3_key
+        })
+        state["total_chunks"] += len(file_chunks)
+
+        vector_store = create_vector_store(state["raw_documents"])
+        state["vector_store"] = vector_store
+        save_vector_store(vector_store)
+
+        if state["hybrid_enabled"]:
+            create_bm25_retriever(state["raw_documents"])
+
+        save_processed_files(state["processed_files"])
+
+    return {
+        "status": "success",
+        "processed_files": state["processed_files"],
+        "total_chunks": state["total_chunks"]
+    }
+
 
 @app.post("/api/upload")
 async def upload_files(

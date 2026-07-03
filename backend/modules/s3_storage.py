@@ -74,6 +74,25 @@ def load_json(s3_key: str, default=None) -> Any:
 
 # ─── File Upload/Download ────────────────────────────────────────────────────
 
+def generate_presigned_upload_url(s3_key: str, content_type: str = "application/octet-stream", expiration: int = 3600) -> Optional[str]:
+    """Tạo presigned URL cho phép Frontend upload trực tiếp lên S3 qua HTTP PUT."""
+    try:
+        url = get_s3_client().generate_presigned_url(
+            "put_object",
+            Params={
+                "Bucket": config.S3_BUCKET,
+                "Key": s3_key,
+                "ContentType": content_type,
+            },
+            ExpiresIn=expiration
+        )
+        logger.info(f"[S3] Generated Presigned Upload URL cho key: {s3_key}")
+        return url
+    except Exception as e:
+        logger.error(f"[S3] Lỗi khi sinh Presigned URL cho {s3_key}: {e}")
+        return None
+
+
 def upload_file(local_path: str, s3_key: str) -> bool:
     """Upload file từ local lên S3."""
     try:

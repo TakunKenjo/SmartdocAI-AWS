@@ -9,9 +9,6 @@ IS_LAMBDA = os.environ.get("AWS_LAMBDA_FUNCTION_NAME") is not None
 if IS_LAMBDA:
     UPLOAD_DIR = "/tmp/data/uploads"
     VECTORSTORE_DIR = "/tmp/vectorstore"
-    # Trỏ HuggingFace cache đến model đã được pre-download trong image
-    os.environ.setdefault("TRANSFORMERS_CACHE", "/var/task/hf_cache")
-    os.environ.setdefault("HF_HOME", "/var/task/hf_cache")
 else:
     UPLOAD_DIR = os.path.join(BASE_DIR, "data", "uploads")
     VECTORSTORE_DIR = os.path.join(BASE_DIR, "vectorstore")
@@ -40,9 +37,8 @@ S3_KEY_PROCESSED_FILES = f"{S3_METADATA_PREFIX}/processed_files.json"
 S3_KEY_CHAT_HISTORY = f"{S3_METADATA_PREFIX}/chat_history.json"
 S3_KEY_SEARCH_CONFIG = f"{S3_METADATA_PREFIX}/search_config.json"
 
-EMBEDDING_MODEL = "sentence-transformers/LaBSE"
-EMBEDDING_DEVICE = "cpu"
-EMBEDDING_NORMALIZE = True
+EMBEDDING_MODEL = "amazon.titan-embed-text-v2:0"
+EMBEDDING_DIMENSIONS = 1024
 
 CHUNK_SIZE = 1500
 CHUNK_OVERLAP = 200
