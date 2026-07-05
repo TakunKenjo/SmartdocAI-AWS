@@ -1,27 +1,26 @@
-# Money Tracker (Ứng dụng theo dõi thu chi cá nhân)
-Đồ án môn: Các công nghệ lập trình hiện đại (2026)
+# Smart Docs AI
+Đồ án thực tập AWS
 
-## Hướng dẫn cài đặt và chạy dự án Money Tracker
+## Hướng dẫn cài đặt và chạy dự án 
 1. Mở **Terminal** của máy tính tại thư mục muốn lưu dự án, chạy lệnh 
 ```shell
-git clone https://github.com/QtotheH/money-tracker.git
- ```
+git clone https://github.com/TakunKenjo/SmartdocAI-AWS.git
 2. Sau khi chạy hoàn tất, truy cập vào thư mục dự án bằng lệnh
 ```shell
-cd money-tracker/money-tracker
+cd smart-docs-ai\smart-docs-ai
 ```
 3. Cài đặt các dependencies của dự án (Lưu ý: máy tính đã cài đặt Node.js từ trước)
 ```shell
 npm install
 ```
-4. Trong thư mục đồ án **`money-tracker`**, copy file `.env-example` và đổi tên file thành `.env`.
+4. Trong thư mục đồ án **`smart-docs-ai`**, copy file `.env-example` và đổi tên file thành `.env`.
 
 
 5. Sau khi cài đặt dependencies hoàn tất, khởi động (chạy) dự án bằng lệnh:
 ```shell
 npm run dev:all 
 ```
-6. Truy cập vào đường dẫn `http://localhost:5173/` để sử dụng Money Tracker ^.^
+6. Truy cập vào đường dẫn `http://localhost:5173/` để sử dụng ^.^
 
 ## 1. GIẢI THÍCH CẤU TRÚC THƯ MỤC DỰ ÁN
 ### 1.1. Cấu trúc tổng quan
