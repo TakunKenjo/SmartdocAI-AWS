@@ -16,13 +16,6 @@ else:
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(VECTORSTORE_DIR, exist_ok=True)
 
-OLLAMA_MODEL = "qwen2.5:1.5b"
-OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_TEMPERATURE = 0.7
-OLLAMA_TOP_P = 0.9
-OLLAMA_REPEAT_PENALTY = 1.1
-OLLAMA_NUM_CTX = 4096
-
 AWS_MODEL_ID = "mistral.mixtral-8x7b-instruct-v0:1"
 AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 

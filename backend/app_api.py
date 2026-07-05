@@ -377,8 +377,8 @@ class ProcessDocumentRequest(BaseModel):
 
 @app.get("/api/status")
 def get_status():
-    from modules.rag_chain import check_ollama_connection
-    state["ollama_status"] = check_ollama_connection()
+    from modules.rag_chain import check_aws_connection
+    state["ollama_status"] = check_aws_connection()
     processed_files = get_processed_files()
     return {
         "ollama_status": state["ollama_status"],
@@ -521,104 +521,7 @@ def process_document(data: ProcessDocumentRequest):
     }
 
 
-@app.post("/api/upload")
-async def upload_files(
-    files: List[UploadFile] = File(...),
-    chunk_size: Optional[int] = Form(None),
-    chunk_overlap: Optional[int] = Form(None)
-):
-    from modules.vector_store import clear_vector_store, create_vector_store, save_vector_store, create_bm25_retriever
-    from modules.document_processor import extract_text_from_pdf, extract_text_from_docx, split_documents
 
-    if not files:
-        raise HTTPException(status_code=400, detail="Không nhận được file nào.")
-
-    if chunk_size is not None:
-        state["chunk_size"] = chunk_size
-    if chunk_overlap is not None:
-        state["chunk_overlap"] = chunk_overlap
-
-    # Reset vector store và cache nếu upload đợt mới (Giống Streamlit app.py)
-    clear_vector_store()
-    state["vector_store"] = None
-    state["raw_documents"] = []
-    state["processed_files"] = []
-    state["total_chunks"] = 0
-
-    global _files_loaded
-    _files_loaded = True
-
-    all_chunks = []
-    new_files_info = []
-
-    for uf in files:
-        file_name = uf.filename
-        _, file_ext = os.path.splitext(file_name)
-        file_ext = file_ext.lower() if file_ext else ".pdf"
-
-        if file_ext not in [".pdf", ".docx"]:
-            continue
-
-        try:
-            # Lưu file tạm với đúng phần mở rộng
-            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
-                shutil.copyfileobj(uf.file, tmp)
-                tmp_path = tmp.name
-
-            # Trích xuất văn bản
-            if file_ext == ".docx":
-                raw_docs = extract_text_from_docx(tmp_path, source_name=file_name)
-            else:
-                raw_docs = extract_text_from_pdf(tmp_path, source_name=file_name)
-            num_pages = len(raw_docs)
-
-            # Chia nhỏ
-            chunks = split_documents(
-                raw_docs,
-                chunk_size=state["chunk_size"],
-                chunk_overlap=state["chunk_overlap"],
-            )
-
-            if chunks:
-                all_chunks.extend(chunks)
-                new_files_info.append(
-                    {"name": file_name, "chunks": len(chunks), "pages": num_pages}
-                )
-                logger.info(f"Đã xử lý '{file_name}': {num_pages} trang -> {len(chunks)} chunks")
-            
-        except Exception as e:
-            logger.error(f"Lỗi khi xử lý '{file_name}': {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Lỗi xử lý file {file_name}: {str(e)}")
-        finally:
-            if "tmp_path" in locals() and os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-
-    if all_chunks:
-        try:
-            # Tạo Vector Store
-            state["vector_store"] = create_vector_store(all_chunks)
-            save_vector_store(state["vector_store"])
-
-            # Cập nhật state
-            state["processed_files"].extend(new_files_info)
-            state["total_chunks"] += len(all_chunks)
-            state["raw_documents"].extend(all_chunks)
-
-            # Lưu processed_files
-            save_processed_files(state["processed_files"])
-
-            # Cập nhật BM25 retriever
-            create_bm25_retriever(state["raw_documents"])
-
-        except Exception as e:
-            logger.error(f"Lỗi khi tạo vector store: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Lỗi tạo vector index: {str(e)}")
-
-    return {
-        "status": "success",
-        "processed_files": state["processed_files"],
-        "total_chunks": state["total_chunks"]
-    }
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
