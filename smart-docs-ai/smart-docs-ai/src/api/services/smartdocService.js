@@ -56,17 +56,7 @@ export const smartdocService = {
     return { data: res.data.processed_files };
   },
 
-  // POST /api/upload (multipart/form-data fallback)
-  uploadDocuments: async (files, chunkSize = 1500, chunkOverlap = 100) => {
-    const formData = new FormData();
-    Array.from(files).forEach((f) => formData.append("files", f));
-    formData.append("chunk_size", chunkSize);
-    formData.append("chunk_overlap", chunkOverlap);
-    const res = await axiosClient.post("/api/upload", formData, {
-      timeout: 120000,
-    });
-    return { data: res.data.processed_files };
-  },
+
 
 
   // GET /api/files
