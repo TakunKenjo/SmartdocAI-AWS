@@ -15,10 +15,13 @@ export const smartdocService = {
   // GET /api/status
   checkStatus: async () => {
     const res = await axiosClient.get("/api/status");
+    // JSON thực tế: { online, provider, model, embedding_provider, embedding_model,
+    //                 total_files, total_pages, total_chunks, model_ready }
     return {
       data: {
-        online: res.data.ollama_status,
-        model: res.data.ollama_model,
+        online:    res.data.online,                    // ← đúng field name
+        model:     res.data.model     || "",           // ← đúng field name
+        provider:  res.data.provider  || "LLM",       // ← thêm provider
         modelReady: res.data.model_ready || false,
       }
     };
