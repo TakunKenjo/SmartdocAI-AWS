@@ -16,7 +16,7 @@ else:
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(VECTORSTORE_DIR, exist_ok=True)
 
-AWS_MODEL_ID = "mistral.mixtral-8x7b-instruct-v0:1"
+AWS_MODEL_ID = "qwen.qwen3-next-80b-a3b"
 AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 
 # S3 Storage
@@ -32,7 +32,6 @@ S3_KEY_SEARCH_CONFIG = f"{S3_METADATA_PREFIX}/search_config.json"
 
 # LLM
 LLM_PROVIDER = "Amazon Bedrock"
-AWS_MODEL_ID = "mistral.mixtral-8x7b-instruct-v0:1"
 
 # Embedding
 EMBEDDING_PROVIDER = "Amazon Titan"

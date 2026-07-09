@@ -127,10 +127,10 @@ def get_llm() -> Any:
     global _llm
     if _llm is None:
         from langchain_aws import ChatBedrock
-        logger.info("Đang khởi tạo kết nối AWS Bedrock (Mixtral 8x7B)...")
+        logger.info(f"Đang khởi tạo kết nối AWS Bedrock ({config.AWS_MODEL_ID})...")
         _llm = ChatBedrock(
             client=bedrock_client,
-            model_id="mistral.mixtral-8x7b-instruct-v0:1", # type:ignore
+            model_id=config.AWS_MODEL_ID, # type:ignore
             model_kwargs={
                 "temperature": 0.1,
                 "max_tokens": 4096,
