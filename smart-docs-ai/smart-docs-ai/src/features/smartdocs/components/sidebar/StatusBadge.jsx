@@ -16,6 +16,8 @@ function StatusBadge({ status, loading }) {
   }
 
   const isOnline = status?.online;
+  const provider = status?.provider || "LLM";
+  const model = status?.model || "";
 
   return (
     <div
@@ -36,8 +38,8 @@ function StatusBadge({ status, loading }) {
       />
       <span className="truncate">
         {isOnline
-          ? `Ollama đang hoạt động — ${status?.model || "llama3.2:3b"}`
-          : "Ollama không khả dụng"}
+          ? `${provider} đang hoạt động${model ? ` — ${model}` : ""}`
+          : `${provider} không khả dụng`}
       </span>
     </div>
   );
