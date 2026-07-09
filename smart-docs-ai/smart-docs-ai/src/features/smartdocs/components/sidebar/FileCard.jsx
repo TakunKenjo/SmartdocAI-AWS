@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
 
 /**
  * FileCard — Hiển thị một file item với icon, tên, size, badge chunks
  * Theo design SmartdocAI: compact card với PDF/DOCX icon, hover effect
  */
-function FileCard({ file, badge, badgeText }) {
+function FileCard({ file, badge, badgeText, onRemove }) {
   const name = file?.name || "";
   const isDocx = name.toLowerCase().endsWith(".docx");
   const fileType = isDocx ? "DOCX" : "PDF";
@@ -42,12 +43,24 @@ function FileCard({ file, badge, badgeText }) {
         )}
       </div>
 
-      {/* Badge */}
-      {(badge || badgeText || file?.chunks) && (
-        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-full px-2 py-0.5 whitespace-nowrap flex-shrink-0">
-          {badgeText || `${file?.chunks} chunks`}
-        </span>
-      )}
+     {/* Badge + Remove */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {(badge || badgeText || file?.chunks) && (
+          <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-full px-2 py-0.5 whitespace-nowrap">
+            {badgeText || `${file?.chunks} chunks`}
+          </span>
+        )}
+
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
