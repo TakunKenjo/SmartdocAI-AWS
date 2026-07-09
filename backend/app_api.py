@@ -66,7 +66,7 @@ state = {
     "total_chunks": 0,
     "raw_documents": [],
     "chat_history": [],
-    "ollama_status": None,
+    "llm_status": None,
     
     # Settings mặc định
     "chunk_size": config.CHUNK_SIZE,
@@ -378,15 +378,24 @@ class ProcessDocumentRequest(BaseModel):
 @app.get("/api/status")
 def get_status():
     from modules.rag_chain import check_aws_connection
-    state["ollama_status"] = check_aws_connection()
+
+    connection = check_aws_connection()
+    state["llm_status"] = connection
     processed_files = get_processed_files()
+
     return {
-        "ollama_status": state["ollama_status"],
-        "ollama_model": config.AWS_MODEL_ID,
+         "online": connection,
+
+        "provider": config.LLM_PROVIDER,
+        "model": config.AWS_MODEL_ID,
+
+        "embedding_provider": config.EMBEDDING_PROVIDER,
         "embedding_model": config.EMBEDDING_MODEL,
+
         "total_files": len(processed_files),
         "total_pages": sum(f.get("pages", 0) for f in processed_files),
         "total_chunks": state["total_chunks"],
+
         "model_ready": True
     }
 

@@ -30,6 +30,12 @@ S3_KEY_PROCESSED_FILES = f"{S3_METADATA_PREFIX}/processed_files.json"
 S3_KEY_CHAT_HISTORY = f"{S3_METADATA_PREFIX}/chat_history.json"
 S3_KEY_SEARCH_CONFIG = f"{S3_METADATA_PREFIX}/search_config.json"
 
+# LLM
+LLM_PROVIDER = "Amazon Bedrock"
+AWS_MODEL_ID = "mistral.mixtral-8x7b-instruct-v0:1"
+
+# Embedding
+EMBEDDING_PROVIDER = "Amazon Titan"
 EMBEDDING_MODEL = "amazon.titan-embed-text-v2:0"
 EMBEDDING_DIMENSIONS = 1024
 
