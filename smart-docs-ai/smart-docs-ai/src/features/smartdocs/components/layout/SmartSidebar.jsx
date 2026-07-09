@@ -1,6 +1,6 @@
-import { useEffect, useContext } from "react";
+import { useEffect, useContext, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { BrainCircuit, RefreshCw, Sun, Moon } from "lucide-react";
+import { BrainCircuit, RefreshCw, Sun, Moon, PanelLeftClose, PanelLeftOpen, } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
 import { ThemeContext } from "@/contexts/ThemeContext.jsx";
@@ -27,6 +27,7 @@ import ChatHistoryList from "../sidebar/ChatHistoryList.jsx";
  * Layout từ trên xuống: Brand → Status → KPI → Chunk Settings → Upload → File List → Actions → History
  */
 function SmartSidebar() {
+  const [collapsed, setCollapsed] = useState(false);
   const dispatch = useDispatch();
   const { isDark, toggleTheme } = useContext(ThemeContext);
   const ollamaStatus = useSelector(selectOllamaStatus);
@@ -46,43 +47,81 @@ function SmartSidebar() {
   const totalPages = processedFiles.reduce((sum, f) => sum + (f.pages || 0), 0);
 
   return (
-    <aside className="w-72 flex-shrink-0 h-full bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-0 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
+  <aside
+    className={`${
+      collapsed ? "w-20" : "w-72"
+    } flex-shrink-0 h-full bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-all duration-300`}
+  >      
+      <div
+        className={`flex-1 overflow-y-auto py-5 transition-all ${
+            collapsed ? "px-2" : "px-4"
+        }`}
+      >
 
         {/* ── Brand Header ── */}
-        <div className="flex items-center justify-between mb-5">
+        <div
+          className={`flex ${
+            collapsed ? "flex-col items-center gap-3" : "items-center justify-between"
+          } mb-5`}
+        >
+          {/* Logo */}
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-blue-600/30">
               <BrainCircuit className="h-5 w-5 text-white" />
             </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-50 leading-tight font-sans">
-                SmartDocAI
-              </h2>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
-                Trợ lý Tài liệu Thông minh
-              </p>
-            </div>
+
+            {!collapsed && (
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-50">
+                  SmartDocAI
+                </h2>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                  Trợ lý Tài liệu Thông minh
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Theme toggle */}
-          <div className="flex items-center gap-1">
+          {/* Buttons */}
+          <div
+            className={`flex ${
+              collapsed ? "flex-col gap-2 mt-2" : "items-center gap-1"
+            }`}
+          >
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={() => setCollapsed(!collapsed)}
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </Button>
+
             <Toggle
               pressed={isDark}
               onPressedChange={toggleTheme}
               size="sm"
-              className="h-7 w-7 p-0"
+              className="h-8 w-8 p-0"
               aria-label="Toggle theme"
             >
-              {isDark ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+              {isDark ? (
+                <Moon className="h-4 w-4" />
+              ) : (
+                <Sun className="h-4 w-4" />
+              )}
             </Toggle>
           </div>
         </div>
 
         {/* ── Ollama Status ── */}
-        <StatusBadge status={ollamaStatus} loading={statusLoading} />
+        {!collapsed && (<StatusBadge status={ollamaStatus} loading={statusLoading} /> )}
 
-        <Button
+
+         {!collapsed && (<Button
           variant="outline"
           size="sm"
           className="w-full text-xs mb-4"
@@ -90,38 +129,38 @@ function SmartSidebar() {
         >
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${statusLoading ? "animate-spin" : ""}`} />
           Kiểm tra kết nối
-        </Button>
+        </Button> )}
 
         {/* ── KPI Stats ── */}
-        <KpiRow
+         {!collapsed && (<KpiRow
           totalFiles={processedFiles.length}
           totalPages={totalPages}
           totalChunks={totalChunks}
-        />
+        />)}
 
         {/* ── Divider + Chunk Settings ── */}
-        <SectionLabel label="Cài đặt Chunking" />
-        <ChunkSettings />
+        {!collapsed && (<SectionLabel label="Cài đặt Chunking" />)}
+        {!collapsed && (<ChunkSettings />)}
 
         {/* ── Divider + Upload ── */}
-        <SectionDivider />
-        <SectionLabel label="Tải tài liệu lên" />
-        <FileUploader />
+        {!collapsed && (<SectionDivider />)}
+        {!collapsed && (<SectionLabel label="Tải tài liệu lên" />)}
+        {!collapsed && (<FileUploader />)}
 
         {/* ── Divider + Processed Files ── */}
-        <SectionDivider />
-        <SectionLabel label="Tài liệu đã xử lý" />
-        <FileList />
+        {!collapsed && (<SectionDivider />)}
+        {!collapsed && (<SectionLabel label="Tài liệu đã xử lý" />)}
+        {!collapsed && (<FileList />)}
 
         {/* ── Divider + Actions ── */}
-        <SectionDivider />
-        <SectionLabel label="Thao tác" />
-        <ActionButtons />
+        {!collapsed && (<SectionDivider />)}
+        {!collapsed && (<SectionLabel label="Thao tác" />)}
+        {!collapsed && (<ActionButtons />)}
 
         {/* ── Divider + Chat History ── */}
-        <SectionDivider />
-        <SectionLabel label="Lịch sử hội thoại" />
-        <ChatHistoryList />
+        {!collapsed && (<SectionDivider />)}
+        {!collapsed && (<SectionLabel label="Lịch sử hội thoại" />)}
+        {!collapsed && (<ChatHistoryList />)}
       </div>
     </aside>
   );

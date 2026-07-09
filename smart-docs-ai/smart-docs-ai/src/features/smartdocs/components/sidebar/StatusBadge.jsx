@@ -21,6 +21,11 @@ function StatusBadge({ status, loading }) {
 
   return (
     <div
+      title={
+        isOnline
+          ? `${provider} đang hoạt động${model ? ` — ${model}` : ""}`
+          : `${provider} không khả dụng`
+      }
       className={cn(
         "flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold mb-4 border transition-all",
         isOnline
@@ -45,4 +50,4 @@ function StatusBadge({ status, loading }) {
   );
 }
 
-export default StatusBadge;
+export default StatusBadge;  
