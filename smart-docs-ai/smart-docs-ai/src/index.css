@@ -166,6 +166,14 @@
     overflow: hidden;
 }
 
+/* Auth pages override — cần scroll, không bị cắt */
+#root:has(.auth-page) {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+}
+
+
 /* SmartdocAI — thin scrollbar */
 ::-webkit-scrollbar {
     width: 4px;

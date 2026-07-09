@@ -1,6 +1,7 @@
 import { useEffect, useContext, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { BrainCircuit, RefreshCw, Sun, Moon, PanelLeftClose, PanelLeftOpen, } from "lucide-react";
+import { useNavigate } from "react-router";
+import { BrainCircuit, RefreshCw, Sun, Moon, PanelLeftClose, PanelLeftOpen, LogOut } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
 import { ThemeContext } from "@/contexts/ThemeContext.jsx";
@@ -13,6 +14,7 @@ import {
   selectProcessedFiles,
   selectTotalChunks,
 } from "@/store/slices/smartdocSlice.js";
+import { logout, selectAuthUser } from "@/store/slices/authSlice.js";
 
 import StatusBadge from "../sidebar/StatusBadge.jsx";
 import KpiRow from "../sidebar/KpiRow.jsx";
@@ -29,11 +31,18 @@ import ChatHistoryList from "../sidebar/ChatHistoryList.jsx";
 function SmartSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { isDark, toggleTheme } = useContext(ThemeContext);
   const ollamaStatus = useSelector(selectOllamaStatus);
   const statusLoading = useSelector(selectStatusLoading);
   const processedFiles = useSelector(selectProcessedFiles);
   const totalChunks = useSelector(selectTotalChunks);
+  const authUser = useSelector(selectAuthUser);
+
+  const handleLogout = async () => {
+    await dispatch(logout());
+    navigate("/login", { replace: true });
+  };
 
   // Kiểm tra Ollama, danh sách tài liệu và lịch sử chat khi mount
   useEffect(() => {
@@ -161,6 +170,43 @@ function SmartSidebar() {
         {!collapsed && (<SectionDivider />)}
         {!collapsed && (<SectionLabel label="Lịch sử hội thoại" />)}
         {!collapsed && (<ChatHistoryList />)}
+      </div>
+
+      {/* ── Logout footer ── */}
+      <div className={`flex-shrink-0 border-t border-slate-200 dark:border-slate-800 ${
+        collapsed ? "p-2" : "p-3"
+      }`}>
+        {collapsed ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-9 w-9 mx-auto flex text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+            onClick={handleLogout}
+            title="Đăng xuất"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
+                {authUser?.fullname || authUser?.email?.split("@")[0] || "Người dùng"}
+              </p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                {authUser?.email || ""}
+              </p>
+            </div>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 flex-shrink-0 text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+              onClick={handleLogout}
+              title="Đăng xuất"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </aside>
   );
