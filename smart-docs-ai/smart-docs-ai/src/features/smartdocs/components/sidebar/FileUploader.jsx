@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Upload, Loader2, CheckCircle2 } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   uploadDocuments,
@@ -34,6 +34,10 @@ function FileUploader() {
       return;
     }
     setSelectedFiles(valid);
+  };
+
+  const removeFile = (index) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleDrop = (e) => {
@@ -94,8 +98,13 @@ function FileUploader() {
       {selectedFiles.length > 0 && (
         <div className="space-y-1">
           {selectedFiles.map((f, i) => (
-            <FileCard key={i} file={f} badgeText="Sẵn sàng" />
-          ))}
+          <FileCard
+            key={i}
+            file={f}
+            badgeText="Sẵn sàng"
+            onRemove={() => removeFile(i)}
+          />
+        ))}
         </div>
       )}
 
