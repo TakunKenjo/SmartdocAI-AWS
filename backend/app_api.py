@@ -632,32 +632,12 @@ async def chat_endpoint(request: ChatRequest):
                 file_filter=state["active_file_filter"],
                 forced_docs=forced_docs if forced_docs else None,
                 raw_documents=state["raw_documents"],
+                reranker_enabled=state["reranker_enabled"],
             )
 
-            # Reranking
+            # Nếu bật Reranker, cập nhật search_mode để hiển thị trên UI
             if state["reranker_enabled"] and vector_store is not None:
-                if retriever is not None:
-                    doc_score_pairs = _compute_rrf_scores(retriever, user_input)
-                else:
-                    doc_score_pairs = vector_store.similarity_search_with_score(user_input)
-                
-                if doc_score_pairs:
-                    reranked = rerank_with_cross_encoder(user_input, doc_score_pairs, top_k=3)
-                    reranked_sources = []
-                    for idx, (doc, bi_score, ce_score) in enumerate(reranked):
-                        fname = os.path.basename(str(doc.metadata.get("source", "N/A")))
-                        reranked_sources.append({
-                            "file": fname,
-                            "page": doc.metadata.get("page", "N/A"),
-                            "total_pages": doc.metadata.get("total_pages"),
-                            "file_type": doc.metadata.get("file_type", "pdf"),
-                            "content": doc.page_content,
-                            "chunk_index": idx + 1,
-                            "score": float(ce_score),
-                            "bi_encoder_score": float(bi_score),
-                        })
-                    result["sources"] = reranked_sources
-                    result["search_mode"] = result.get("search_mode", "vector") + "+reranked"
+                result["search_mode"] = result.get("search_mode", "vector") + "+reranked"
 
         # Định dạng cấu trúc trả về
         mode = result.get("search_mode", "vector")
