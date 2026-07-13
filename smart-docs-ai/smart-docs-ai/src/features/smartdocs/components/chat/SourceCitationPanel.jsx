@@ -91,7 +91,7 @@ function SourceCitationPanel({ sources, question = "", answer = "" }) {
                   </div>
 
                   {/* Score bar */}
-                  <div className="flex items-center gap-2 mb-2.5">
+                  {/* <div className="flex items-center gap-2 mb-2.5">
                     <span className="text-[10px] text-slate-400 dark:text-slate-500 w-16 whitespace-nowrap">
                       Độ liên quan
                     </span>
@@ -104,7 +104,7 @@ function SourceCitationPanel({ sources, question = "", answer = "" }) {
                     <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 w-8 text-right">
                       {scorePct}%
                     </span>
-                  </div>
+                  </div> */}
 
                   {/* Content */}
                   <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 max-h-36 overflow-y-auto font-mono whitespace-pre-wrap break-words">
