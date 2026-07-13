@@ -1,11 +1,13 @@
-import { useSelector } from "react-redux";
-import { selectProcessedFiles } from "@/store/slices/smartdocSlice.js";
+import { useSelector, useDispatch } from "react-redux";
+import { selectProcessedFiles, deleteDocument } from "@/store/slices/smartdocSlice.js";
 import FileCard from "./FileCard.jsx";
+import { toast } from "sonner";
 
 /**
  * FileList — Danh sách file đã được xử lý (mới nhất lên đầu)
  */
 function FileList() {
+  const dispatch = useDispatch();
   const files = useSelector(selectProcessedFiles);
 
   if (!files.length) {
@@ -18,10 +20,23 @@ function FileList() {
     );
   }
 
+  const handleDelete = async (filename) => {
+    const result = await dispatch(deleteDocument(filename));
+    if (deleteDocument.fulfilled.match(result)) {
+      toast.success(`Đã xóa tài liệu "${filename}" thành công!`);
+    } else {
+      toast.error(result.payload || `Lỗi khi xóa tài liệu: ${filename}`);
+    }
+  };
+
   return (
     <div className="space-y-0.5 max-h-52 overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
       {[...files].reverse().map((f, i) => (
-        <FileCard key={i} file={f} />
+        <FileCard 
+          key={i} 
+          file={f} 
+          onRemove={() => handleDelete(f.name)}
+        />
       ))}
     </div>
   );

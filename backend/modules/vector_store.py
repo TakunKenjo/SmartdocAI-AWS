@@ -35,6 +35,9 @@ class ParallelBedrockEmbeddings:
     def embed_query(self, text: str) -> List[float]:
         return self.base_embeddings.embed_query(text)
 
+    def __call__(self, text: str) -> List[float]:
+        return self.embed_query(text)
+
 
 def get_embedding_model() -> Any:
     global _embedding_model
@@ -173,14 +176,23 @@ def similarity_search_with_scores(
     _top_k = top_k or config.RETRIEVAL_TOP_K
 
     try:
-        results = vector_store.similarity_search_with_relevance_scores(
+        # Sử dụng similarity_search_with_score (trực tiếp L2/cosine distance)
+        # để tránh bị lọc mất kết quả bởi bộ lọc ngưỡng (threshold 0.8) mặc định của LangChain
+        results = vector_store.similarity_search_with_score(
             query,
             k=_top_k,
         )
+        
+        # Chuẩn hóa distance thành relevance score trong khoảng [0, 1] bằng công thức 1 / (1 + d)
+        normalized_results = []
+        for doc, dist in results:
+            score = round(1.0 / (1.0 + float(dist)), 4)
+            normalized_results.append((doc, score))
+            
         logger.info(
-            f"[with_scores] Tìm thấy {len(results)} kết quả cho query: '{query[:50]}...'"
+            f"[with_scores] Tìm thấy {len(normalized_results)} kết quả cho query: '{query[:50]}...'"
         )
-        return results  # list of (Document, float)
+        return normalized_results
 
     except Exception as e:
         logger.error(f"Lỗi khi tìm kiếm với score: {str(e)}")

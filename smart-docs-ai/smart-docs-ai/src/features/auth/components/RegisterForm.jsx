@@ -1,15 +1,19 @@
 import { Link, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mail, Lock, User, Calendar, Phone, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, User, Calendar, Phone, Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { useState } from "react";
-import { register } from "@/store/slices/authSlice.js";
+import { register, confirmCode } from "@/store/slices/authSlice.js";
 import { toast } from "sonner";
 
 const RegisterForm = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
+  const [step, setStep] = useState("register"); // "register" hoặc "confirm"
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationError, setVerificationError] = useState("");
 
   const [formData, setFormData] = useState({
     fullname: "", email: "", phone: "", dob: "", password: "", confirmPassword: "",
@@ -58,11 +62,32 @@ const RegisterForm = () => {
     try {
       await dispatch(register(formData)).unwrap();
       toast.success("Đăng ký thành công!", {
-        description: "Vui lòng đăng nhập để tiếp tục.",
+        description: "Mã xác thực đã được gửi đến email của bạn.",
+      });
+      setStep("confirm");
+    } catch (error) {
+      toast.error("Lỗi đăng ký", { description: error });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault();
+    if (!verificationCode.trim()) {
+      setVerificationError("Vui lòng nhập mã xác thực.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await dispatch(confirmCode({ email: formData.email, code: verificationCode })).unwrap();
+      toast.success("Kích hoạt tài khoản thành công!", {
+        description: "Tài khoản của bạn đã sẵn sàng. Hãy đăng nhập.",
       });
       navigate("/login");
     } catch (error) {
-      toast.error("Lỗi đăng ký", { description: error });
+      toast.error("Xác thực thất bại", { description: error });
     } finally {
       setIsSubmitting(false);
     }
@@ -80,6 +105,77 @@ const RegisterForm = () => {
     `bg-slate-800 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20 pl-9 ${
       errors[field] ? "border-red-500 focus:border-red-500" : ""
     }`;
+
+  if (step === "confirm") {
+    return (
+      <div className="w-full">
+        {/* Header */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-slate-100 mb-1">Xác thực tài khoản</h2>
+          <p className="text-slate-400 text-sm">
+            Chúng tôi đã gửi mã xác thực gồm 6 chữ số đến email <span className="text-blue-400 font-semibold">{formData.email}</span>.
+          </p>
+        </div>
+
+        <form onSubmit={handleVerifyCode} className="space-y-4" noValidate>
+          {/* OTP Code */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-slate-300">Mã xác thực (OTP)</label>
+            <div className="relative">
+              <ShieldAlert className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <Input
+                name="verificationCode"
+                value={verificationCode}
+                onChange={(e) => {
+                  setVerificationCode(e.target.value);
+                  setVerificationError("");
+                }}
+                className={`bg-slate-800 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20 pl-9 tracking-widest text-center text-lg font-bold ${
+                  verificationError ? "border-red-500 focus:border-red-500" : ""
+                }`}
+                placeholder="123456"
+                maxLength={6}
+              />
+            </div>
+            {verificationError && (
+              <p className="text-red-400 text-xs flex items-center gap-1 mt-1">
+                <span>⚠</span> {verificationError}
+              </p>
+            )}
+          </div>
+
+          {/* Submit */}
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold h-10 mt-1 shadow-lg shadow-blue-600/20 transition-all duration-200"
+          >
+            {isSubmitting ? (
+              <span className="flex items-center gap-2 justify-center">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                Đang xác thực...
+              </span>
+            ) : (
+              "Kích hoạt tài khoản"
+            )}
+          </Button>
+
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={() => setStep("register")}
+              className="text-sm text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Quay lại đăng ký
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -220,7 +316,7 @@ const RegisterForm = () => {
           className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold h-10 mt-1 shadow-lg shadow-blue-600/20 transition-all duration-200"
         >
           {isSubmitting ? (
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 justify-center">
               <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />

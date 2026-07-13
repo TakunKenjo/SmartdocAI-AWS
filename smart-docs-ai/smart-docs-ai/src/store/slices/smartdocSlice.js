@@ -96,7 +96,8 @@ export const uploadDocuments = createAsyncThunk(
 
       return lastProcessedFiles;
     } catch (err) {
-      return rejectWithValue(err?.response?.data?.message || err?.message || "Xử lý tài liệu thất bại!");
+      const errMsg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Xử lý tài liệu thất bại!";
+      return rejectWithValue(errMsg);
     }
   }
 );
@@ -109,6 +110,18 @@ export const clearDocuments = createAsyncThunk(
       await smartdocService.clearDocuments();
     } catch (err) {
       return rejectWithValue(err?.message || "Xóa tài liệu thất bại!");
+    }
+  }
+);
+
+export const deleteDocument = createAsyncThunk(
+  "smartdoc/deleteDocument",
+  async (filename, { rejectWithValue }) => {
+    try {
+      const res = await smartdocService.deleteDocument(filename);
+      return { filename, data: res.data };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data?.message || err?.message || "Xóa tài liệu thất bại!");
     }
   }
 );
@@ -223,8 +236,7 @@ const smartdocSlice = createSlice({
       })
       .addCase(uploadDocuments.fulfilled, (state, action) => {
         state.isProcessing = false;
-        const newFiles = action.payload;
-        state.processedFiles.push(...newFiles);
+        state.processedFiles = action.payload || [];
         state.totalChunks = state.processedFiles.reduce((sum, f) => sum + (f.chunks || 0), 0);
       })
       .addCase(uploadDocuments.rejected, (state, action) => {
@@ -237,6 +249,14 @@ const smartdocSlice = createSlice({
         state.processedFiles = [];
         state.totalChunks = 0;
         state.activeFileFilter = [];
+      })
+
+      // ── Delete Document ──
+      .addCase(deleteDocument.fulfilled, (state, action) => {
+        const { filename } = action.payload;
+        state.processedFiles = state.processedFiles.filter((f) => f.name !== filename);
+        state.totalChunks = state.processedFiles.reduce((sum, f) => sum + (f.chunks || 0), 0);
+        state.activeFileFilter = state.activeFileFilter.filter((name) => name !== filename);
       })
 
       // ── Send Message ──

@@ -236,6 +236,7 @@ def ask_question(
     file_filter: Optional[list] = None,
     forced_docs: Optional[list] = None,
     raw_documents: Optional[list] = None,
+    reranker_enabled: bool = False,
 ) -> Dict[str, Any]:
     result = {
         "answer": "",
@@ -319,10 +320,17 @@ def ask_question(
                 doc_score_pairs = [(doc, 1.0) for doc in relevant_docs]
             else:
                 search_question = _reformulate_question(question, chat_history, llm)
+                
+                # Xác định số lượng Top-K cần retrieve ban đầu
+                # Nếu bật Reranker, chúng ta lấy rộng (15 chunks) để Cross-Encoder sắp xếp lại
+                retrieve_k = 15 if reranker_enabled else config.RETRIEVAL_TOP_K
+                
                 if retriever is not None:
                     doc_score_pairs = _compute_rrf_scores(retriever, search_question)
                 else:
-                    doc_score_pairs = similarity_search_with_scores(vector_store, search_question)
+                    doc_score_pairs = similarity_search_with_scores(
+                        vector_store, search_question, top_k=retrieve_k
+                    )
 
                 if forced_docs:
                     existing_keys = {d.page_content[:120] for d, _ in doc_score_pairs}
@@ -339,6 +347,15 @@ def ask_question(
                         (doc, score) for doc, score in doc_score_pairs
                         if any(f in doc.metadata.get("source", "") for f in file_filter)
                     ]
+                
+                # Thực hiện Rerank bằng Cross-Encoder nếu được bật
+                if reranker_enabled and doc_score_pairs:
+                    from modules.reranker import rerank_with_cross_encoder
+                    logger.info(f"Đang thực hiện Cross-Encoder Rerank cho {len(doc_score_pairs)} chunks...")
+                    # Chọn ra 5 chunks tốt nhất cho context của LLM
+                    reranked = rerank_with_cross_encoder(search_question, doc_score_pairs, top_k=5)
+                    # Chuyển đổi format reranked [(doc, bi_score, ce_score)] thành [(doc, ce_score)]
+                    doc_score_pairs = [(doc, ce_score) for doc, _, ce_score in reranked]
             
             relevant_docs = [doc for doc, _ in doc_score_pairs]
             context = format_context(relevant_docs)

@@ -374,6 +374,9 @@ class ProcessDocumentRequest(BaseModel):
     chunk_size: Optional[int] = None
     chunk_overlap: Optional[int] = None
 
+class DeleteDocumentRequest(BaseModel):
+    filename: str
+
 
 @app.get("/api/status")
 def get_status():
@@ -458,7 +461,7 @@ def get_upload_url(data: UploadUrlRequest):
 
 @app.post("/api/process")
 def process_document(data: ProcessDocumentRequest):
-    from modules.vector_store import clear_vector_store, create_vector_store, save_vector_store, create_bm25_retriever
+    from modules.vector_store import create_vector_store, save_vector_store, create_bm25_retriever
     from modules.document_processor import extract_text_from_pdf, extract_text_from_docx, split_documents
 
     if not data.filename or not data.s3_key:
@@ -481,11 +484,13 @@ def process_document(data: ProcessDocumentRequest):
         if not success:
             raise HTTPException(status_code=404, detail=f"Không tìm thấy file {data.s3_key} trên S3.")
 
-    clear_vector_store()
-    state["vector_store"] = None
-    state["raw_documents"] = []
-    state["processed_files"] = []
-    state["total_chunks"] = 0
+    # Tải danh sách file và vector store hiện tại trước khi xử lý để thêm/ghi đè tài liệu mới
+    get_processed_files()
+    get_vector_store()
+
+    # Kiểm tra nếu file đã tồn tại, xóa dữ liệu cũ của file đó trước để tránh bị trùng lặp khi ghi đè
+    state["processed_files"] = [f for f in state["processed_files"] if f["name"] != data.filename]
+    state["raw_documents"] = [doc for doc in state["raw_documents"] if doc.metadata.get("source") != data.filename]
 
     global _files_loaded
     _files_loaded = True
@@ -512,7 +517,7 @@ def process_document(data: ProcessDocumentRequest):
             "pages": len(raw_docs),
             "s3_key": data.s3_key
         })
-        state["total_chunks"] += len(file_chunks)
+        state["total_chunks"] = sum(f.get("chunks", 0) for f in state["processed_files"])
 
         vector_store = create_vector_store(state["raw_documents"])
         state["vector_store"] = vector_store
@@ -522,6 +527,76 @@ def process_document(data: ProcessDocumentRequest):
             create_bm25_retriever(state["raw_documents"])
 
         save_processed_files(state["processed_files"])
+
+    return {
+        "status": "success",
+        "processed_files": state["processed_files"],
+        "total_chunks": state["total_chunks"]
+    }
+
+
+@app.post("/api/delete-document")
+def delete_document(data: DeleteDocumentRequest):
+    filename = data.filename
+    if not filename:
+        raise HTTPException(status_code=400, detail="Filename là bắt buộc.")
+
+    # 1. Tải danh sách file và vector store hiện tại
+    processed_files = get_processed_files()
+    get_vector_store()
+
+    # 2. Định vị file tương ứng để lấy s3_key
+    target_file = None
+    for f in processed_files:
+        if f["name"] == filename:
+            target_file = f
+            break
+
+    if not target_file:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy tài liệu {filename}")
+
+    # 3. Xóa đối tượng trên S3 (ở thư mục uploads)
+    s3_key = target_file.get("s3_key")
+    if s3_key:
+        try:
+            s3_storage.delete_key(s3_key)
+        except Exception as e:
+            logger.error(f"Lỗi khi xóa file {s3_key} trên S3: {e}")
+
+    # 4. Xóa file local tạm (nếu có)
+    local_file_path = os.path.join(tempfile.gettempdir(), "uploads", filename)
+    if os.path.exists(local_file_path):
+        try:
+            os.remove(local_file_path)
+        except Exception as e:
+            logger.error(f"Lỗi khi xóa local file {local_file_path}: {e}")
+
+    # 5. Loại bỏ các chunks liên quan trong state["raw_documents"] và cập nhật processed_files
+    state["processed_files"] = [f for f in processed_files if f["name"] != filename]
+    state["raw_documents"] = [doc for doc in state["raw_documents"] if doc.metadata.get("source") != filename]
+    state["total_chunks"] = sum(f.get("chunks", 0) for f in state["processed_files"])
+
+    # 6. Cập nhật lại Vector Store
+    if state["raw_documents"]:
+        from modules.vector_store import create_vector_store, save_vector_store, create_bm25_retriever
+        new_vs = create_vector_store(state["raw_documents"])
+        state["vector_store"] = new_vs
+        save_vector_store(new_vs)
+        if state["hybrid_enabled"]:
+            create_bm25_retriever(state["raw_documents"])
+    else:
+        from modules.vector_store import clear_vector_store
+        clear_vector_store()
+        state["vector_store"] = None
+
+    # 7. Lưu lại processed_files.json
+    save_processed_files(state["processed_files"])
+
+    # 8. Cập nhật active_file_filter nếu file bị xóa đang nằm trong bộ lọc
+    get_app_config()
+    if filename in state["active_file_filter"]:
+        state["active_file_filter"] = [name for name in state["active_file_filter"] if name != filename]
+        save_app_config()
 
     return {
         "status": "success",
@@ -632,32 +707,12 @@ async def chat_endpoint(request: ChatRequest):
                 file_filter=state["active_file_filter"],
                 forced_docs=forced_docs if forced_docs else None,
                 raw_documents=state["raw_documents"],
+                reranker_enabled=state["reranker_enabled"],
             )
 
-            # Reranking
+            # Nếu bật Reranker, cập nhật search_mode để hiển thị trên UI
             if state["reranker_enabled"] and vector_store is not None:
-                if retriever is not None:
-                    doc_score_pairs = _compute_rrf_scores(retriever, user_input)
-                else:
-                    doc_score_pairs = vector_store.similarity_search_with_score(user_input)
-                
-                if doc_score_pairs:
-                    reranked = rerank_with_cross_encoder(user_input, doc_score_pairs, top_k=3)
-                    reranked_sources = []
-                    for idx, (doc, bi_score, ce_score) in enumerate(reranked):
-                        fname = os.path.basename(str(doc.metadata.get("source", "N/A")))
-                        reranked_sources.append({
-                            "file": fname,
-                            "page": doc.metadata.get("page", "N/A"),
-                            "total_pages": doc.metadata.get("total_pages"),
-                            "file_type": doc.metadata.get("file_type", "pdf"),
-                            "content": doc.page_content,
-                            "chunk_index": idx + 1,
-                            "score": float(ce_score),
-                            "bi_encoder_score": float(bi_score),
-                        })
-                    result["sources"] = reranked_sources
-                    result["search_mode"] = result.get("search_mode", "vector") + "+reranked"
+                result["search_mode"] = result.get("search_mode", "vector") + "+reranked"
 
         # Định dạng cấu trúc trả về
         mode = result.get("search_mode", "vector")

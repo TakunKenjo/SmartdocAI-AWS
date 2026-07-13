@@ -72,6 +72,11 @@ export const smartdocService = {
     return axiosClient.post("/api/clear-documents");
   },
 
+  // POST /api/delete-document
+  deleteDocument: async (filename) => {
+    return axiosClient.post("/api/delete-document", { filename });
+  },
+
   // POST /api/chat
   sendMessage: async (question, options = {}) => {
     return axiosClient.post("/api/chat", {
