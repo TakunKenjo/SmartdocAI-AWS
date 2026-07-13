@@ -23,7 +23,7 @@ function ChatMessage({ message }) {
   return (
     <div
       className={cn(
-        "flex gap-3 animate-in slide-in-from-bottom-2 duration-300",
+        "flex gap-3",
         isUser ? "justify-end" : "justify-start"
       )}
     >
@@ -39,6 +39,7 @@ function ChatMessage({ message }) {
         <div
           className={cn(
             "rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
+            "animate-in slide-in-from-bottom-2 duration-300",
             isUser
               ? "bg-blue-600 text-white rounded-br-sm"
               : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-bl-sm"
