@@ -1,9 +1,25 @@
 import axios from "axios"
+import { getSessionToken } from "./cognito.js"
 
 const axiosClient = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL,
     timeout: 300000,
 })
+
+// Chèn Cognito Token vào Header cho mỗi Request gửi lên Backend
+axiosClient.interceptors.request.use(async (config) => {
+    try {
+        const token = await getSessionToken();
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+    } catch (e) {
+        console.error("[Axios Interceptor] Lỗi khi lấy token Cognito:", e);
+    }
+    return config;
+}, (error) => {
+    return Promise.reject(error);
+});
 
 axiosClient.interceptors.response.use(
     (response) => response,
