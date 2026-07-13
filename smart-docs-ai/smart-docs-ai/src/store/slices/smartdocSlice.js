@@ -96,7 +96,8 @@ export const uploadDocuments = createAsyncThunk(
 
       return lastProcessedFiles;
     } catch (err) {
-      return rejectWithValue(err?.response?.data?.message || err?.message || "Xử lý tài liệu thất bại!");
+      const errMsg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Xử lý tài liệu thất bại!";
+      return rejectWithValue(errMsg);
     }
   }
 );
@@ -235,8 +236,7 @@ const smartdocSlice = createSlice({
       })
       .addCase(uploadDocuments.fulfilled, (state, action) => {
         state.isProcessing = false;
-        const newFiles = action.payload;
-        state.processedFiles.push(...newFiles);
+        state.processedFiles = action.payload || [];
         state.totalChunks = state.processedFiles.reduce((sum, f) => sum + (f.chunks || 0), 0);
       })
       .addCase(uploadDocuments.rejected, (state, action) => {

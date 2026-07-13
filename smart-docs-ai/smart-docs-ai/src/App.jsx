@@ -21,19 +21,19 @@ function App() {
     <ThemeProvider>
       <Routes>
         {/* Mặc định redirect về /login */}
-        {/* <Route path="/" element={<Navigate to="/login" replace />} /> */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
 
         {/* Public routes — auth */}
-        {/* <Route path="/login" element={<LoginPage />} /> */}
-        {/* <Route path="/register" element={<RegisterPage />} /> */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
         {/* Protected route — trang chính SmartDoc */}
         <Route
           path="/app/*"
           element={
-            // <ProtectedRoute>
-            <SmartdocPage />
-            // </ProtectedRoute>
+            <ProtectedRoute>
+              <SmartdocPage />
+            </ProtectedRoute>
           }
         />
       </Routes>

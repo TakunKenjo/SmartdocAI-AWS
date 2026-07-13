@@ -1,73 +1,101 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { CognitoUser, AuthenticationDetails, CognitoUserAttribute } from "amazon-cognito-identity-js";
+import { userPool } from "@/api/cognito.js";
 
-// ─── Mock delay ────────────────────────────────────────────────────────────────
-const delay = (ms) => new Promise((res) => setTimeout(res, ms));
-
-// ─── Mock "đăng nhập" — Không cần tài khoản thật ──────────────────────────────
-// Chỉ validate form FE, sau đó giả lập login thành công
+// ─── Đăng nhập Cognito ──────────────────────────────────────────────────────────
 export const login = createAsyncThunk(
   "auth/login",
   async ({ email, password }, { rejectWithValue }) => {
-    try {
-      await delay(800); // giả lập call API
-
-      // Validate cơ bản ở đây (BE không được chỉnh sửa)
-      if (!email || !password) {
-        return rejectWithValue("Email và mật khẩu không được để trống.");
-      }
-
-      // Luôn cho đăng nhập thành công (mock)
-      const mockUser = {
-        id: "mock-user-001",
-        email,
-        fullname: email.split("@")[0],
-        role: "user",
+    return new Promise((resolve, reject) => {
+      const authenticationData = {
+        Username: email,
+        Password: password,
       };
-
-      // Lưu vào sessionStorage để persist trong tab
-      sessionStorage.setItem("auth_user", JSON.stringify(mockUser));
-
-      return mockUser;
-    } catch (err) {
-      return rejectWithValue(err?.message || "Đăng nhập thất bại.");
-    }
+      const authenticationDetails = new AuthenticationDetails(authenticationData);
+      const userData = {
+        Username: email,
+        Pool: userPool,
+      };
+      const cognitoUser = new CognitoUser(userData);
+      
+      cognitoUser.authenticateUser(authenticationDetails, {
+        onSuccess: (result) => {
+          const user = {
+            id: result.getIdToken().payload.sub,
+            email: result.getIdToken().payload.email,
+            fullname: result.getIdToken().payload.name || email.split("@")[0],
+            role: "user",
+          };
+          sessionStorage.setItem("auth_user", JSON.stringify(user));
+          resolve(user);
+        },
+        onFailure: (err) => {
+          reject(rejectWithValue(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại."));
+        },
+      });
+    });
   }
 );
 
-// ─── Mock "đăng ký" ────────────────────────────────────────────────────────────
+// ─── Đăng ký Cognito ────────────────────────────────────────────────────────────
 export const register = createAsyncThunk(
   "auth/register",
-  async (formData, { rejectWithValue }) => {
-    try {
-      await delay(900);
-
-      // Lưu thông tin đăng ký vào localStorage (mock DB)
-      const users = JSON.parse(localStorage.getItem("mock_users") || "[]");
-      const exists = users.find((u) => u.email === formData.email);
-      if (exists) {
-        return rejectWithValue("Email này đã được đăng ký.");
+  async ({ email, password, fullname, phone, dob }, { rejectWithValue }) => {
+    return new Promise((resolve, reject) => {
+      const attributeList = [];
+      
+      // Định dạng SĐT sang chuẩn E.164 của Cognito (ví dụ: +84...)
+      let formattedPhone = phone.trim().replace(/\s/g, "");
+      if (formattedPhone.startsWith("0")) {
+        formattedPhone = "+84" + formattedPhone.substring(1);
+      } else if (!formattedPhone.startsWith("+")) {
+        formattedPhone = "+84" + formattedPhone;
       }
-
-      const newUser = {
-        id: `user-${Date.now()}`,
-        email: formData.email,
-        fullname: formData.fullname,
-        phone: formData.phone,
-        dob: formData.dob,
-      };
-
-      users.push(newUser);
-      localStorage.setItem("mock_users", JSON.stringify(users));
-
-      return { success: true };
-    } catch (err) {
-      return rejectWithValue(err?.message || "Đăng ký thất bại.");
-    }
+      
+      attributeList.push(new CognitoUserAttribute({ Name: "email", Value: email }));
+      attributeList.push(new CognitoUserAttribute({ Name: "name", Value: fullname }));
+      attributeList.push(new CognitoUserAttribute({ Name: "phone_number", Value: formattedPhone }));
+      attributeList.push(new CognitoUserAttribute({ Name: "birthdate", Value: dob }));
+      
+      userPool.signUp(email, password, attributeList, null, (err, result) => {
+        if (err) {
+          reject(rejectWithValue(err.message || "Đăng ký thất bại."));
+        } else {
+          resolve({ success: true, email });
+        }
+      });
+    });
   }
 );
 
-// ─── Logout ────────────────────────────────────────────────────────────────────
+// ─── Xác thực Code Đăng ký Cognito ─────────────────────────────────────────────────
+export const confirmCode = createAsyncThunk(
+  "auth/confirmCode",
+  async ({ email, code }, { rejectWithValue }) => {
+    return new Promise((resolve, reject) => {
+      const userData = {
+        Username: email,
+        Pool: userPool,
+      };
+      const cognitoUser = new CognitoUser(userData);
+      
+      cognitoUser.confirmRegistration(code, true, (err, result) => {
+        if (err) {
+          reject(rejectWithValue(err.message || "Mã xác thực không chính xác hoặc đã hết hạn."));
+        } else {
+          resolve(result);
+        }
+      });
+    });
+  }
+);
+
+// ─── Đăng xuất Cognito ────────────────────────────────────────────────────────────
 export const logout = createAsyncThunk("auth/logout", async () => {
+  const cognitoUser = userPool.getCurrentUser();
+  if (cognitoUser) {
+    cognitoUser.signOut();
+  }
   sessionStorage.removeItem("auth_user");
   return null;
 });
@@ -84,8 +112,8 @@ const restoreUser = () => {
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 const initialState = {
-  user: restoreUser(),                   // Restore từ session
-  isAuthenticated: !!restoreUser(),      // true nếu có session
+  user: restoreUser(),
+  isAuthenticated: !!restoreUser(),
   isLoading: false,
   error: null,
 };
@@ -129,6 +157,21 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(register.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
+
+    // ── Confirm Code ──
+    builder
+      .addCase(confirmCode.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(confirmCode.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(confirmCode.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
       });

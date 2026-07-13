@@ -1,3 +1,8 @@
+// Polyfill cho biến global của Node.js trong môi trường trình duyệt của Vite
+if (typeof global === "undefined") {
+  window.global = window;
+}
+
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'

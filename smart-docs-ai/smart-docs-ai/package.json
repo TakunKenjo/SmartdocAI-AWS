@@ -19,6 +19,7 @@
     "@fortawesome/react-fontawesome": "^3.2.0",
     "@reduxjs/toolkit": "^2.11.2",
     "@tailwindcss/vite": "^4.2.1",
+    "amazon-cognito-identity-js": "^6.3.20",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "chart.js": "^4.5.1",
