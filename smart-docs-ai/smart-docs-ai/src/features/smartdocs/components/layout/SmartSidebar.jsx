@@ -235,7 +235,7 @@ function SmartSidebar({ mobileOpen = false, onMobileClose = () => {} }) {
             <Button
               size="icon"
               variant="ghost"
-              className="h-8 w-8 flex-shrink-0 text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors"
+              className="h-8 w-8 flex-shrink-0 text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
               onClick={() => { onMobileClose(); navigate("/app/profile"); }}
               title="Hồ sơ cá nhân"
             >
