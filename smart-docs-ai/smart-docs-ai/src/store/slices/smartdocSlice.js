@@ -113,6 +113,18 @@ export const clearDocuments = createAsyncThunk(
   }
 );
 
+export const deleteDocument = createAsyncThunk(
+  "smartdoc/deleteDocument",
+  async (filename, { rejectWithValue }) => {
+    try {
+      const res = await smartdocService.deleteDocument(filename);
+      return { filename, data: res.data };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data?.message || err?.message || "Xóa tài liệu thất bại!");
+    }
+  }
+);
+
 export const sendMessage = createAsyncThunk(
   "smartdoc/sendMessage",
   async ({ question, options }, { rejectWithValue }) => {
@@ -237,6 +249,14 @@ const smartdocSlice = createSlice({
         state.processedFiles = [];
         state.totalChunks = 0;
         state.activeFileFilter = [];
+      })
+
+      // ── Delete Document ──
+      .addCase(deleteDocument.fulfilled, (state, action) => {
+        const { filename } = action.payload;
+        state.processedFiles = state.processedFiles.filter((f) => f.name !== filename);
+        state.totalChunks = state.processedFiles.reduce((sum, f) => sum + (f.chunks || 0), 0);
+        state.activeFileFilter = state.activeFileFilter.filter((name) => name !== filename);
       })
 
       // ── Send Message ──
