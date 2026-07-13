@@ -1,7 +1,7 @@
 import { useEffect, useContext, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router";
-import { BrainCircuit, RefreshCw, Sun, Moon, PanelLeftClose, PanelLeftOpen, LogOut } from "lucide-react";
+import { BrainCircuit, RefreshCw, Sun, Moon, PanelLeftClose, PanelLeftOpen, LogOut, X } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
 import { ThemeContext } from "@/contexts/ThemeContext.jsx";
@@ -28,7 +28,7 @@ import ChatHistoryList from "../sidebar/ChatHistoryList.jsx";
  * SmartSidebar — Sidebar riêng của SmartdocAI
  * Layout từ trên xuống: Brand → Status → KPI → Chunk Settings → Upload → File List → Actions → History
  */
-function SmartSidebar() {
+function SmartSidebar({ mobileOpen = false, onMobileClose = () => {} }) {
   const [collapsed, setCollapsed] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -57,9 +57,16 @@ function SmartSidebar() {
 
   return (
   <aside
-    className={`${
-      collapsed ? "w-20" : "w-72"
-    } flex-shrink-0 h-full bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-all duration-300`}
+    className={[
+      "fixed inset-y-0 left-0 z-50",
+      mobileOpen ? "translate-x-0" : "-translate-x-full",
+      "md:relative md:inset-auto md:z-auto md:translate-x-0",
+      "w-72",
+      collapsed ? "md:w-20" : "md:w-72",
+      "flex-shrink-0 h-full bg-slate-50 dark:bg-slate-950",
+      "border-r border-slate-200 dark:border-slate-800",
+      "flex flex-col overflow-hidden transition-all duration-300",
+    ].join(" ")}
   >      
       <div
         className={`flex-1 overflow-y-auto py-5 transition-all ${
@@ -97,6 +104,16 @@ function SmartSidebar() {
               collapsed ? "flex-col gap-2 mt-2" : "items-center gap-1"
             }`}
           >
+            {/* Mobile close button — chỉ hiện trên mobile */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="md:hidden h-8 w-8 mr-1"
+              onClick={onMobileClose}
+              aria-label="Đóng menu"
+            >
+              <X className="h-4 w-4" />
+            </Button>
             <Button
               size="icon"
               variant="ghost"
