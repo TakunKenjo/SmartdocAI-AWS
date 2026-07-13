@@ -211,4 +211,53 @@
     animation-name: slide-in-from-top;
 }
 .duration-200 { animation-duration: 0.2s; }
-.duration-300 { animation-duration: 0.3s; }
+.duration-300 { animation-duration: 0.3s; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Mobile Responsive — SmartdocAI
+   Chỉ bổ sung, không ghi đè styles cũ ở trên.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Ngăn horizontal scroll trên mobile */
+@media (max-width: 767px) {
+    body {
+        overflow-x: hidden;
+    }
+
+    /* iOS: Ngăn auto-zoom khi focus input (font-size < 16px) */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="tel"],
+    input[type="date"],
+    textarea {
+        font-size: max(16px, 1em) !important;
+    }
+}
+
+/* Safe area cho các thiết bị có notch / home bar */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .safe-area-bottom {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
+
+/* Sidebar mobile drawer — slide-in transition */
+.mobile-sidebar-enter {
+    transform: translateX(-100%);
+}
+.mobile-sidebar-enter-active {
+    transform: translateX(0);
+    transition: transform 0.3s ease-out;
+}
+
+/* Mobile chat area full-height fix */
+@media (max-width: 767px) {
+    #root {
+        height: 100dvh; /* dynamic viewport height — tránh bị cắt bởi browser bar */
+    }
+    #root:has(.auth-page) {
+        height: auto;
+        min-height: 100dvh;
+    }
+}
