@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { BrainCircuit, ChevronDown, Loader2 } from "lucide-react";
 import {
   selectChatHistory,
   selectIsChatLoading,
@@ -68,7 +68,7 @@ function ChatArea() {
             {isLoading && (
               <div className="flex gap-3 justify-start animate-in slide-in-from-bottom-2 duration-300">
                 <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 mt-1">
-                  <Loader2 className="h-4 w-4 text-white animate-spin" />
+                  <BrainCircuit className="h-4 w-4 text-white" />
                 </div>
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
                   <div className="flex gap-1 items-center">
@@ -106,7 +106,7 @@ function ChatArea() {
         >
           <span>⚙ Cài đặt tìm kiếm nâng cao</span>
           <ChevronDown
-            className={`h-4 w-4 transition-transform duration-200 ${settingsOpen ? "rotate-180" : ""}`}
+            className={`h-4 w-4 transition-transform duration-200 ${settingsOpen ? "" : "rotate-180"}`}
           />
         </button>
 
