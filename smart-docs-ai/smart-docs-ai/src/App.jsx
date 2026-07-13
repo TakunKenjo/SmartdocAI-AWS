@@ -5,6 +5,7 @@ import SmartdocPage from "@/features/smartdocs/pages/SmartdocPage.jsx";
 import LoginPage from "@/features/auth/pages/LoginPage.jsx";
 import RegisterPage from "@/features/auth/pages/RegisterPage.jsx";
 import ProtectedRoute from "@/features/auth/components/ProtectedRoute.jsx";
+import ProfilePage from "@/features/profile/pages/ProfilePage.jsx";
 import { ThemeProvider } from "@/contexts/ThemeContext.jsx";
 import { Toaster } from "@/components/ui/sonner";
 import { checkOllamaStatus } from "@/store/slices/smartdocSlice";
@@ -33,6 +34,16 @@ function App() {
           element={
             <ProtectedRoute>
               <SmartdocPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected route — Hồ sơ cá nhân */}
+        <Route
+          path="/app/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />
