@@ -9,6 +9,7 @@ phases:
   build:
     commands:
       - npm run build
+      - aws cloudfront create-invalidation --distribution-id E5QRZJSUK0QTJ --paths "/*"
 
 artifacts:
   base-directory: smart-docs-ai/smart-docs-ai/dist
