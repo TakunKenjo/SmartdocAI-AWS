@@ -64,8 +64,8 @@ const LoginForm = () => {
             to="/register"
             className="text-blue-400 font-medium hover:text-blue-300 transition-colors"
           >
-            {/* Đăng ký ngay */}
-            Đăng ký ngay!
+            Đăng ký ngay
+            {/* Đăng ký ngay! */}
           </Link>
         </p>
       </div>
