@@ -19,6 +19,13 @@ os.makedirs(VECTORSTORE_DIR, exist_ok=True)
 AWS_MODEL_ID = "qwen.qwen3-next-80b-a3b"
 AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 
+# Cognito Authentication
+COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID", "us-east-1_3oq5wIiuu")
+COGNITO_CLIENT_ID = os.getenv("COGNITO_CLIENT_ID", "63f74h4dj78kqihhoimv4acl8a")
+
+# DynamoDB Tables
+DYNAMODB_USERS_TABLE = os.getenv("DYNAMODB_USERS_TABLE", "smartdocai-user-profiles")
+
 # S3 Storage
 S3_BUCKET = os.getenv("S3_BUCKET", "smartdocai-storage-623035187993")
 S3_VECTORSTORE_PREFIX = "vectorstore"

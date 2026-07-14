@@ -41,7 +41,7 @@ logger = logging.getLogger("SmartDocAI_API")
 app = FastAPI(
     title="SmartDocAI API",
     version="1.0.0",
-    root_path="/prod" if config.IS_LAMBDA else ""
+    root_path="/prod"  # API Gateway stage prefix
 )
 
 # Cấu hình CORS để hỗ trợ React chạy trên môi trường dev local khác port
@@ -848,6 +848,290 @@ def clear_documents():
     state["active_file_filter"] = []
     
     return {"status": "success"}
+
+# ════════════════════════════════════════════════════════════════════════════════
+# AUTH ENDPOINTS — Xác thực người dùng (Register, Confirm)
+# ════════════════════════════════════════════════════════════════════════════════
+
+from modules import auth_service, profile_service
+from fastapi import Header
+
+
+# ─── Request Schemas (Auth) ────────────────────────────────────────────────────
+
+class RegisterRequest(BaseModel):
+    """Đăng ký tài khoản mới"""
+    email: str
+    password: str
+    fullname: str
+    phone: str
+    dob: str  # YYYY-MM-DD
+
+
+class ConfirmSignUpRequest(BaseModel):
+    """Xác thực email đăng ký"""
+    email: str
+    confirmation_code: str
+
+
+# ─── Endpoints (Auth) ──────────────────────────────────────────────────────
+
+@app.post("/api/auth/register")
+async def register(request: RegisterRequest):
+    """
+    POST /api/auth/register — Đăng ký tài khoản mới
+    
+    Tạo user mới trong Cognito + DynamoDB profile
+    
+    Request:
+    {
+        "email": "user@example.com",
+        "password": "Password123!",
+        "fullname": "Nguyễn Văn A",
+        "phone": "0901234567",
+        "dob": "1990-01-01"
+    }
+    
+    Response:
+    {
+        "success": true,
+        "user_id": "...",
+        "email": "...",
+        "message": "Đăng ký thành công..."
+    }
+    """
+    try:
+        logger.info(f"[Auth] Register: email={request.email}")
+        result = auth_service.register_user(
+            email=request.email,
+            password=request.password,
+            fullname=request.fullname,
+            phone=request.phone,
+            dob=request.dob
+        )
+        logger.info(f"[Auth] ✅ Register success: {result['user_id']}")
+        return result
+    
+    except ValueError as e:
+        logger.warning(f"[Auth] ⚠️  Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    except Exception as e:
+        error_msg = str(e).lower()
+        # Duplicate email should return 409 Conflict
+        if "đã được đăng ký" in error_msg or "already" in error_msg:
+            logger.warning(f"[Auth] ⚠️  Duplicate email: {e}")
+            raise HTTPException(status_code=409, detail=str(e))
+        logger.error(f"[Auth] ❌ Register error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/auth/confirm-signup")
+async def confirm_signup(request: ConfirmSignUpRequest):
+    """
+    POST /api/auth/confirm-signup — Xác thực email đăng ký
+    
+    Xác nhận mã từ email để kích hoạt tài khoản
+    
+    Request:
+    {
+        "email": "user@example.com",
+        "confirmation_code": "123456"
+    }
+    
+    Response:
+    {
+        "success": true,
+        "message": "Email xác thực thành công..."
+    }
+    """
+    try:
+        logger.info(f"[Auth] ConfirmSignUp: email={request.email}")
+        result = auth_service.confirm_user_signup(
+            email=request.email,
+            confirmation_code=request.confirmation_code
+        )
+        logger.info(f"[Auth] ✅ ConfirmSignUp success: {request.email}")
+        return result
+    
+    except Exception as e:
+        logger.error(f"[Auth] ❌ ConfirmSignUp error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# PROFILE ENDPOINTS — Quản lý hồ sơ người dùng
+# ════════════════════════════════════════════════════════════════════════════════
+
+def extract_user_id_from_token(authorization: str = Header(None)) -> str:
+    """
+    Trích xuất user_id (Cognito sub) từ JWT token Authorization header
+    Header format: "Bearer eyJhbGc..."
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token không hợp lệ")
+    
+    try:
+        import json
+        import base64
+        
+        token = authorization.replace("Bearer ", "").strip()
+        parts = token.split(".")
+        
+        if len(parts) != 3:
+            raise ValueError("Token format không hợp lệ")
+        
+        # Decode JWT payload
+        payload = parts[1]
+        padding = 4 - len(payload) % 4
+        if padding != 4:
+            payload += "=" * padding
+        
+        decoded = base64.urlsafe_b64decode(payload)
+        claims = json.loads(decoded)
+        
+        user_id = claims.get("sub")
+        if not user_id:
+            raise ValueError("Token không chứa 'sub' claim")
+        
+        return user_id
+        
+    except Exception as e:
+        logger.error(f"[Token] Lỗi decode: {e}")
+        raise HTTPException(status_code=401, detail=f"Token không hợp lệ: {str(e)}")
+
+
+# ─── Request Schemas ───────────────────────────────────────────────────────
+
+class PersonalInfoRequest(BaseModel):
+    """Cập nhật thông tin cá nhân"""
+    fullname: str
+    email: str
+    phone: str
+    dob: str  # YYYY-MM-DD
+
+
+class AvatarRequest(BaseModel):
+    """Upload avatar"""
+    avatar: str  # base64 string
+
+
+class ChangePasswordRequest(BaseModel):
+    """Đổi mật khẩu"""
+    current_password: str
+    new_password: str
+
+
+# ─── Endpoints ─────────────────────────────────────────────────────────────
+
+@app.get("/api/profile")
+def get_profile(authorization: str = Header(None)):
+    """GET /api/profile — Lấy hồ sơ người dùng"""
+    try:
+        user_id = extract_user_id_from_token(authorization)
+        user_profile = profile_service.get_user_profile(user_id)
+        
+        if not user_profile:
+            raise HTTPException(status_code=404, detail="Hồ sơ người dùng không tìm thấy")
+        
+        return user_profile
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Profile] Lỗi: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+
+
+@app.put("/api/profile/personal-info")
+def update_personal_info(
+    data: PersonalInfoRequest,
+    authorization: str = Header(None)
+):
+    """PUT /api/profile/personal-info — Cập nhật info (name, email, phone, dob)"""
+    try:
+        user_id = extract_user_id_from_token(authorization)
+        result = profile_service.update_personal_info(
+            user_id=user_id,
+            fullname=data.fullname,
+            email=data.email,
+            phone=data.phone,
+            dob=data.dob
+        )
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Profile] Lỗi: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.put("/api/profile/avatar")
+def update_avatar(
+    data: AvatarRequest,
+    authorization: str = Header(None)
+):
+    """PUT /api/profile/avatar — Upload avatar"""
+    try:
+        user_id = extract_user_id_from_token(authorization)
+        result = profile_service.update_avatar(user_id, data.avatar)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Profile] Lỗi: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/profile/change-password")
+def change_password(
+    data: ChangePasswordRequest,
+    authorization: str = Header(None)
+):
+    """POST /api/profile/change-password — Đổi mật khẩu"""
+    try:
+        import json
+        import base64
+        
+        # Extract email từ JWT token
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Token không hợp lệ")
+        
+        token = authorization.replace("Bearer ", "").strip()
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise ValueError("Token format không hợp lệ")
+        
+        payload = parts[1]
+        padding = 4 - len(payload) % 4
+        if padding != 4:
+            payload += "=" * padding
+        
+        decoded = base64.urlsafe_b64decode(payload)
+        claims = json.loads(decoded)
+        
+        user_id = claims.get("sub")
+        email = claims.get("email")
+        
+        if not user_id:
+            raise ValueError("Token không chứa 'sub' claim")
+        
+        result = profile_service.change_password(
+            user_id=user_id,
+            email=email,
+            current_password=data.current_password,
+            new_password=data.new_password
+        )
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Profile] Lỗi: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 # Phục vụ file tĩnh của frontend React ở root
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

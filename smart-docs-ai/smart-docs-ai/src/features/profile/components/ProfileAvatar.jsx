@@ -135,7 +135,7 @@ const ProfileAvatar = () => {
 
   // Save button
   const handleSave = async () => {
-    if (!selectedFile || !user?.id) return;
+    if (!selectedFile) return;
     setIsSubmitting(true);
     try {
       const resizedBlob = await resizeImage(selectedFile, 300, 0.7);
@@ -148,7 +148,7 @@ const ProfileAvatar = () => {
       // convert base64
       const base64 = await fileToBase64(resizedFile);
       console.log("Sau resize:", (resizedFile.size / 1024).toFixed(0), "KB");    
-      await dispatch(updateAvatar({ userId: user.id, avatar: base64 })).unwrap();
+      await dispatch(updateAvatar({ avatar: base64 })).unwrap();
       toast.success("Cập nhật ảnh đại diện thành công!");
       setSelectedFile(null);
     } catch (error) {
