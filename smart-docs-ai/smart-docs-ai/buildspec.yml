@@ -4,7 +4,7 @@ phases:
   install:
     commands:
       - cd smart-docs-ai/smart-docs-ai
-      - npm install
+      - npm ci
 
   build:
     commands:
