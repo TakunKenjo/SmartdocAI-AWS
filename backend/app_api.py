@@ -110,7 +110,8 @@ def load_processed_files() -> list:
         logger.error(f"Lỗi khi tải processed_files: {e}")
         return []
 
-def save_chat_history(history: list):
+def save_chat_history(history: list, user_id: str = None):
+    """Lưu chat history riêng per-user"""
     safe_history = []
     for msg in history:
         safe_msg = {
@@ -126,22 +127,45 @@ def save_chat_history(history: list):
         safe_history.append(safe_msg)
 
     if config.IS_LAMBDA:
-        s3_storage.save_json(safe_history, config.S3_KEY_CHAT_HISTORY)
+        # Per-user chat history in S3
+        if user_id:
+            key = f"chat_history/{user_id}.json"
+        else:
+            key = config.S3_KEY_CHAT_HISTORY
+        s3_storage.save_json(safe_history, key)
     else:
         try:
             os.makedirs(_PERSIST_DIR, exist_ok=True)
-            with open(_HISTORY_PATH, "w", encoding="utf-8") as f:
+            # Per-user chat history in local filesystem
+            if user_id:
+                path = os.path.join(_PERSIST_DIR, f"chat_history_{user_id}.json")
+            else:
+                path = _HISTORY_PATH
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(safe_history, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"Lỗi khi lưu chat_history: {e}")
 
-def load_chat_history() -> list:
+def load_chat_history(user_id: str = None) -> list:
+    """Tải chat history riêng per-user"""
     if config.IS_LAMBDA:
-        return s3_storage.load_json(config.S3_KEY_CHAT_HISTORY, default=[])
-    if not os.path.exists(_HISTORY_PATH):
+        # Per-user chat history from S3
+        if user_id:
+            key = f"chat_history/{user_id}.json"
+        else:
+            key = config.S3_KEY_CHAT_HISTORY
+        return s3_storage.load_json(key, default=[])
+    
+    # Per-user chat history from local filesystem
+    if user_id:
+        path = os.path.join(_PERSIST_DIR, f"chat_history_{user_id}.json")
+    else:
+        path = _HISTORY_PATH
+    
+    if not os.path.exists(path):
         return []
     try:
-        with open(_HISTORY_PATH, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Lỗi khi tải chat_history: {e}")
@@ -219,16 +243,15 @@ def get_processed_files():
     return state["processed_files"]
 
 
-def get_chat_history():
-    global _history_loaded
-    if not _history_loaded or config.IS_LAMBDA:
-        saved_history = load_chat_history()
-        if saved_history:
-            state["chat_history"] = saved_history
-            logger.info(f"Đã khôi phục {len(saved_history)} tin nhắn từ disk/S3.")
-        else:
-            state["chat_history"] = []
-        _history_loaded = True
+def get_chat_history(user_id: str = None):
+    """Tải chat history per-user từ S3/disk"""
+    # Always load from storage để đảm bảo per-user isolation
+    saved_history = load_chat_history(user_id)
+    if saved_history:
+        state["chat_history"] = saved_history
+        logger.info(f"Đã khôi phục {len(saved_history)} tin nhắn cho user {user_id or 'unknown'}.")
+    else:
+        state["chat_history"] = []
     return state["chat_history"]
 
 
@@ -608,7 +631,18 @@ def delete_document(data: DeleteDocumentRequest):
 
 
 @app.post("/api/chat")
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(request: ChatRequest, authorization: str = Header(None)):
+    """Chat endpoint - per-user isolation"""
+    
+    # Extract user_id from JWT token (for per-user chat isolation)
+    user_id = None
+    if authorization:
+        try:
+            user_id = extract_user_id_from_token(authorization)
+        except HTTPException:
+            # If token invalid, continue without user isolation
+            pass
+    
     user_input = request.message
     if not user_input.strip():
         raise HTTPException(status_code=400, detail="Nội dung tin nhắn trống.")
@@ -627,11 +661,11 @@ async def chat_endpoint(request: ChatRequest):
     if request.coRagAgentConceptual is not None: state["co_rag_agent_conceptual"] = request.coRagAgentConceptual
     if request.activeFileFilter is not None: state["active_file_filter"] = request.activeFileFilter
 
-    # Lưu câu hỏi của người dùng vào history
-    chat_history = get_chat_history()
+    # Lưu câu hỏi của người dùng vào history (per-user isolation)
+    chat_history = get_chat_history(user_id)
     user_msg = {"role": "user", "content": user_input, "timestamp": time.time()}
     chat_history.append(user_msg)
-    save_chat_history(chat_history)
+    save_chat_history(chat_history, user_id)
 
     # Bắt đầu xử lý phản hồi từ AI
     self_rag_meta = None
@@ -774,41 +808,63 @@ async def chat_endpoint(request: ChatRequest):
         }
 
         chat_history.append(assistant_msg)
-        save_chat_history(chat_history)
+        save_chat_history(chat_history, user_id)
 
         return assistant_msg
 
     except Exception as e:
         logger.error(f"Lỗi trong endpoint chat: {e}", exc_info=True)
         # Rollback message của user nếu lỗi để tránh mất đồng bộ
-        chat_history = get_chat_history()
+        chat_history = get_chat_history(user_id)
         if chat_history and chat_history[-1]["role"] == "user":
             chat_history.pop()
-            save_chat_history(chat_history)
+            save_chat_history(chat_history, user_id)
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý câu hỏi: {str(e)}")
 
 @app.get("/api/history")
-def get_history():
-    return get_chat_history()
+def get_history(authorization: str = Header(None)):
+    """Get chat history - per-user"""
+    user_id = None
+    if authorization:
+        try:
+            user_id = extract_user_id_from_token(authorization)
+        except HTTPException:
+            pass
+    return get_chat_history(user_id)
 
 
 @app.post("/api/clear-history")
-def clear_history():
-    global _history_loaded
+def clear_history(authorization: str = Header(None)):
+    """Clear user's chat history - per-user"""
+    user_id = None
+    if authorization:
+        try:
+            user_id = extract_user_id_from_token(authorization)
+        except HTTPException:
+            pass
+    
     state["chat_history"] = []
-    _history_loaded = True
     
     # Xóa local copy
     try:
-        if os.path.exists(_HISTORY_PATH):
-            os.remove(_HISTORY_PATH)
+        if user_id:
+            path = os.path.join(_PERSIST_DIR, f"chat_history_{user_id}.json")
+        else:
+            path = _HISTORY_PATH
+        
+        if os.path.exists(path):
+            os.remove(path)
     except Exception as e:
         logger.error(f"Lỗi khi xóa chat_history local: {e}")
         
     # Xóa trên S3 để đồng bộ hóa serverless
     if config.IS_LAMBDA:
         try:
-            s3_storage.delete_key(config.S3_KEY_CHAT_HISTORY)
+            if user_id:
+                key = f"chat_history/{user_id}.json"
+            else:
+                key = config.S3_KEY_CHAT_HISTORY
+            s3_storage.delete_key(key)
         except Exception as e:
             logger.error(f"Lỗi khi xóa chat_history trên S3: {e}")
             raise HTTPException(status_code=500, detail=f"Không thể xóa file lịch sử trên S3: {e}")
