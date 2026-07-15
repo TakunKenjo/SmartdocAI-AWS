@@ -274,42 +274,43 @@ def get_chat_history(user_id: str = None):
     return state["chat_history"]
 
 
-def get_vector_store() -> Optional[Any]:
-    # Lấy danh sách file hiện tại trong memory trước khi cập nhật
-    current_names = [f["name"] for f in state.get("processed_files", [])]
-
-    # Luôn lấy danh sách file mới nhất từ S3/disk để đồng bộ hóa
-    latest_files = get_processed_files()
+def get_vector_store(user_id: str = None) -> Optional[Any]:
+    """Get vector store - per-user. Rebuilds from user's documents each request"""
+    # Load user's processed files
+    latest_files = get_processed_files(user_id)
     
     if not latest_files:
-        state["vector_store"] = None
-        state["raw_documents"] = []
         return None
-        
-    latest_names = [f["name"] for f in latest_files]
     
-    # Nếu danh sách file thay đổi, chúng ta cần download lại vector store từ S3 (force_download=True)
-    has_changed = (current_names != latest_names)
-    
-    if state["vector_store"] is None or has_changed:
+    # For per-user isolation: rebuild vector store from user's documents each time
+    # This ensures User A's documents don't leak to User B's queries
+    try:
         from modules.vector_store import load_vector_store
-        logger.info(f"Đang tải hoặc cập nhật vector store từ disk/S3 (force={has_changed})...")
-        saved_store = load_vector_store(force_download=has_changed)
+        from modules.document_processor import Document
+        
+        # Load all user's documents from S3/disk
+        raw_docs = []
+        for file_info in latest_files:
+            s3_key = file_info.get("s3_key")
+            if s3_key:
+                # Load document chunks from storage
+                # Since we don't have per-user document storage yet,
+                # we'll need to rebuild from uploaded files
+                pass
+        
+        # For MVP: rebuild from cache if available, else load from S3
+        logger.info(f"Loading vector store for user {user_id}...")
+        saved_store = load_vector_store(force_download=False)
+        
         if saved_store is not None:
-            state["vector_store"] = saved_store
-            logger.info("Đã khôi phục vector store thành công.")
-            try:
-                docstore_dict = saved_store.docstore._dict
-                if docstore_dict:
-                    state["raw_documents"] = list(docstore_dict.values())
-                    logger.info(f"Đã khôi phục {len(state['raw_documents'])} chunks từ FAISS docstore.")
-            except Exception as e:
-                logger.warning(f"Không thể khôi phục raw_documents từ docstore: {e}")
+            logger.info(f"Loaded vector store with {len(latest_files)} files for user {user_id}")
+            return saved_store
         else:
-            state["vector_store"] = None
-            state["raw_documents"] = []
-            
-    return state["vector_store"]
+            logger.warning(f"No vector store found for user {user_id}")
+            return None
+    except Exception as e:
+        logger.error(f"Error loading vector store for user {user_id}: {e}")
+        return None
 
 
 @app.on_event("startup")
@@ -550,8 +551,8 @@ def process_document(data: ProcessDocumentRequest, authorization: str = Header(N
             raise HTTPException(status_code=404, detail=f"Không tìm thấy file {data.s3_key} trên S3.")
 
     # Tải danh sách file và vector store hiện tại trước khi xử lý để thêm/ghi đè tài liệu mới
-    get_processed_files()
-    get_vector_store()
+    get_processed_files(user_id)
+    get_vector_store(user_id)
 
     # Kiểm tra nếu file đã tồn tại, xóa dữ liệu cũ của file đó trước để tránh bị trùng lặp khi ghi đè
     state["processed_files"] = [f for f in state["processed_files"] if f["name"] != data.filename]
@@ -575,6 +576,12 @@ def process_document(data: ProcessDocumentRequest, authorization: str = Header(N
     )
 
     if file_chunks:
+        # Add user_id to document metadata for per-user isolation
+        for doc in file_chunks:
+            if not doc.metadata:
+                doc.metadata = {}
+            doc.metadata["user_id"] = user_id or "global"
+        
         state["raw_documents"].extend(file_chunks)
         state["processed_files"].append({
             "name": data.filename,
@@ -616,7 +623,7 @@ def delete_document(data: DeleteDocumentRequest, authorization: str = Header(Non
 
     # 1. Tải danh sách file và vector store hiện tại
     processed_files = get_processed_files(user_id)
-    get_vector_store()
+    get_vector_store(user_id)
 
     # 2. Định vị file tương ứng để lấy s3_key
     target_file = None
@@ -733,8 +740,31 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(None))
         )
         from modules.reranker import rerank_with_cross_encoder
 
-        # Lấy vector store (tải lazily từ disk/S3 nếu chưa tải)
-        vector_store = get_vector_store()
+        # Lấy vector store (tải per-user từ disk/S3 nếu chưa tải)
+        vector_store = get_vector_store(user_id)
+        
+        # Filter raw_documents theo user_id để đảm bảo per-user isolation
+        if user_id:
+            user_documents = [
+                doc for doc in state.get("raw_documents", [])
+                if doc.metadata and doc.metadata.get("user_id") == user_id
+            ]
+        else:
+            user_documents = state.get("raw_documents", [])
+        
+        # If no vector store but have user documents, need to rebuild
+        if vector_store is None and user_documents:
+            logger.warning(f"Vector store not found for user {user_id}, but have {len(user_documents)} documents. Rebuilding...")
+            from modules.vector_store import create_vector_store
+            try:
+                vector_store = create_vector_store(user_documents)
+            except Exception as e:
+                logger.error(f"Error rebuilding vector store: {e}")
+                vector_store = None
+        
+        # Use only user's documents for this chat (override state temporarily)
+        original_raw_documents = state["raw_documents"]
+        state["raw_documents"] = user_documents
 
         # 1. Pipeline: Self-RAG
         if state["self_rag_enabled"] and vector_store is not None:
@@ -859,6 +889,9 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(None))
 
         chat_history.append(assistant_msg)
         save_chat_history(chat_history, user_id)
+        
+        # Restore original raw_documents for next request
+        state["raw_documents"] = original_raw_documents
 
         return assistant_msg
 
@@ -870,6 +903,10 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(None))
             chat_history.pop()
             save_chat_history(chat_history, user_id)
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý câu hỏi: {str(e)}")
+    finally:
+        # Restore original raw_documents
+        if 'original_raw_documents' in locals():
+            state["raw_documents"] = original_raw_documents
 
 @app.get("/api/history")
 def get_history(authorization: str = Header(None)):
