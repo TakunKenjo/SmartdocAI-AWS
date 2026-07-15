@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from mangum import Mangum
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # Thêm root directory vào path để import các modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -313,9 +314,58 @@ def get_vector_store(user_id: str = None) -> Optional[Any]:
         return None
 
 
+# ═══════════════════════════════════════════════════════════════════
+# BACKGROUND SCHEDULER: Cleanup unverified users
+# ═══════════════════════════════════════════════════════════════════
+
+scheduler = None
+
+def init_scheduler():
+    """
+    Initialize APScheduler for background jobs.
+    Currently running cleanup_unverified_users every 1 minute.
+    
+    See SCHEDULER_SETUP.md for migration guide to CloudWatch.
+    """
+    global scheduler
+    try:
+        from modules.profile_service import cleanup_unverified_users
+        
+        scheduler = BackgroundScheduler()
+        
+        # Job: Cleanup unverified users every 1 minute
+        scheduler.add_job(
+            cleanup_unverified_users,
+            'interval',
+            minutes=1,
+            id='cleanup_unverified_users',
+            name='Cleanup unverified users (5-min timeout)',
+            misfire_grace_time=60,
+            max_instances=1  # Prevent multiple concurrent runs
+        )
+        
+        scheduler.start()
+        logger.info("✅ Background Scheduler initialized")
+        logger.info("   └─ Job: cleanup_unverified_users (every 1 minute)")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize scheduler: {e}")
+        raise
+
+
 @app.on_event("startup")
 def startup_event():
     logger.info("Khởi động API server SmartDocAI...")
+    init_scheduler()
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    """Stop scheduler on shutdown"""
+    global scheduler
+    if scheduler and scheduler.running:
+        scheduler.shutdown()
+        logger.info("🛑 Background Scheduler stopped")
 
 # --- UTILITIES ---
 
