@@ -1,0 +1,17 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - cd smart-docs-ai/smart-docs-ai
+      - npm ci
+
+  build:
+    commands:
+      - npm run build
+      - aws cloudfront create-invalidation --distribution-id E5QRZJSUK0QTJ --paths "/*"
+
+artifacts:
+  base-directory: smart-docs-ai/smart-docs-ai/dist
+  files:
+    - '**/*'
