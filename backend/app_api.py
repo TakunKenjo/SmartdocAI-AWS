@@ -1289,6 +1289,40 @@ def change_password(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# EMAIL VERIFICATION CLEANUP ENDPOINT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/admin/cleanup-unverified-users")
+async def cleanup_unverified_users_endpoint(authorization: str = Header(None)):
+    """
+    [ADMIN ONLY] Xóa tài khoản chưa xác thực email sau 5 phút
+    
+    Sync pattern: Cognito → DynamoDB → S3
+    
+    Returns:
+        {
+            "success": true,
+            "cleaned": 5,           # số user bị xóa
+            "failed": 0,            # số lỗi
+            "details": [...]
+        }
+    """
+    try:
+        # TODO: Add admin auth check (e.g., check admin role in JWT)
+        # For now, log that this was called
+        logger.info("[Admin] cleanup-unverified-users called")
+        
+        from modules.profile_service import cleanup_unverified_users
+        result = cleanup_unverified_users()
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"[Admin] Cleanup error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # Phục vụ file tĩnh của frontend React ở root
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 

@@ -7,7 +7,7 @@ Tích hợp Cognito + DynamoDB
 import boto3
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from botocore.exceptions import ClientError
 from config import AWS_DEFAULT_REGION, COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID, DYNAMODB_USERS_TABLE
 from .profile_service import (
@@ -186,6 +186,8 @@ def register_user(email, password, fullname, phone, dob):
         table = dynamodb.Table(DYNAMODB_USERS_TABLE)
         
         timestamp = get_timestamp()
+        # Calculate verification timeout: 5 minutes from now
+        verification_pending_until = (datetime.utcnow() + timedelta(minutes=5)).replace(microsecond=0).isoformat() + 'Z'
         
         table.put_item(
             Item={
@@ -198,10 +200,27 @@ def register_user(email, password, fullname, phone, dob):
                 'avatar_url': None,
                 'created_at': timestamp,
                 'updated_at': timestamp,
+                # ─────────── EMAIL VERIFICATION (NEW) ─────────────────
+                'email_verified': False,  # Mirrors Cognito (not verified yet)
+                'verification_pending_until': verification_pending_until,  # Auto-cleanup after 5 min
+                'verification_attempts': 0,  # Track resend attempts
+                # ─────────── SUBSCRIPTION & QUOTA (NEW) ───────────────
+                'subscription_plan': 'free',
+                'document_quota': 50,  # Free tier: 50 documents
+                'documents_used': 0,
+                'storage_quota_gb': 1,  # 1GB free
+                # ─────────── PREFERENCES (NEW) ────────────────────────
+                'user_preferences': {
+                    'language': 'vi',
+                    'theme': 'light',
+                    'notifications_enabled': True,
+                    'timezone': 'Asia/Ho_Chi_Minh',
+                },
             }
         )
         
         logger.info(f"[Register] ✅ DynamoDB profile created: user_id={user_id}")
+        logger.info(f"[Register] Verification timeout set to {verification_pending_until}")
         
         return {
             "success": True,
@@ -239,6 +258,7 @@ def register_user(email, password, fullname, phone, dob):
 def confirm_user_signup(email, confirmation_code):
     """
     [ConfirmSignUp] Xác thực email người dùng
+    SYNC PATTERN: Cognito first (source of truth) → DynamoDB second (cache)
     
     Args:
         email (str): Email của user
@@ -256,31 +276,67 @@ def confirm_user_signup(email, confirmation_code):
         
         cognito = get_cognito_client()
         
-        cognito.confirm_sign_up(
-            ClientId=COGNITO_CLIENT_ID,
-            Username=email,
-            ConfirmationCode=confirmation_code
-        )
+        # ─────────────────────────────────────────────────────────────────
+        # STEP 1: Confirm signup in COGNITO FIRST (Source of Truth)
+        # ─────────────────────────────────────────────────────────────────
+        try:
+            cognito.confirm_sign_up(
+                ClientId=COGNITO_CLIENT_ID,
+                Username=email,
+                ConfirmationCode=confirmation_code
+            )
+            logger.info(f"[ConfirmSignUp] ✅ Cognito email verified for {email}")
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            error_msg = e.response['Error']['Message']
+            
+            logger.error(f"[ConfirmSignUp] ❌ Cognito error: {error_code} - {error_msg}")
+            
+            if error_code == 'InvalidParameterException':
+                raise Exception("Mã xác thực không hợp lệ hoặc đã hết hạn")
+            elif error_code == 'UserNotFoundException':
+                raise Exception("Không tìm thấy user")
+            else:
+                raise Exception(f"Lỗi xác thực: {error_msg}")
         
-        logger.info(f"[ConfirmSignUp] ✅ Email xác thực thành công")
+        # ─────────────────────────────────────────────────────────────────
+        # STEP 2: Update DYNAMODB (Cache) - Mirror verification status
+        # ─────────────────────────────────────────────────────────────────
+        try:
+            # Get user from Cognito to find user_id
+            user = cognito.admin_get_user(
+                UserPoolId=COGNITO_USER_POOL_ID,
+                Username=email
+            )
+            user_id = user['Username']  # or from user attributes
+            
+            # Find user_id from sub attribute
+            for attr in user.get('UserAttributes', []):
+                if attr['Name'] == 'sub':
+                    user_id = attr['Value']
+                    break
+            
+            # Update DynamoDB to mirror email_verified and clear timeout
+            dynamodb = get_dynamodb_resource()
+            table = dynamodb.Table(DYNAMODB_USERS_TABLE)
+            table.update_item(
+                Key={'user_id': user_id},
+                UpdateExpression='SET email_verified = :verified, verification_pending_until = :null, updated_at = :now',
+                ExpressionAttributeValues={
+                    ':verified': True,
+                    ':null': None,  # Clear timeout
+                    ':now': get_timestamp(),
+                }
+            )
+            logger.info(f"[DynamoDB] ✅ Updated email_verified for {user_id}")
+        except Exception as e:
+            # Log warning but don't fail - Cognito already confirmed
+            logger.warning(f"[DynamoDB] ⚠️ Failed to update verification status: {e}")
         
         return {
             "success": True,
             "message": "Email xác thực thành công! Bạn có thể đăng nhập ngay."
         }
-    
-    except ClientError as e:
-        error_code = e.response['Error']['Code']
-        error_msg = e.response['Error']['Message']
-        
-        logger.error(f"[ConfirmSignUp] ❌ Cognito error: {error_code} - {error_msg}")
-        
-        if error_code == 'InvalidParameterException':
-            raise Exception("Mã xác thực không hợp lệ hoặc đã hết hạn")
-        elif error_code == 'UserNotFoundException':
-            raise Exception("Không tìm thấy user")
-        else:
-            raise Exception(f"Lỗi xác thực: {error_msg}")
     
     except Exception as e:
         logger.error(f"[ConfirmSignUp] ❌ Error: {str(e)}")

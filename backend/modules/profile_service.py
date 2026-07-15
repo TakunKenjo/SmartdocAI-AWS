@@ -12,7 +12,7 @@ import base64
 import re
 from typing import Optional, Dict, Any
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import boto3
 from botocore.exceptions import ClientError
@@ -250,7 +250,7 @@ def update_personal_info(
 ) -> Dict[str, Any]:
     """
     Cập nhật thông tin cá nhân (name, email, phone, dob)
-    Đồng thời cập nhật Cognito attributes
+    SYNC PATTERN: Cognito first (source of truth) → DynamoDB second (cache)
     
     Args:
         user_id: Cognito sub
@@ -261,9 +261,14 @@ def update_personal_info(
     
     Returns:
         Updated profile
+    
+    Raises:
+        Exception: Nếu Cognito update fail
     """
     try:
-        # Validate inputs
+        # ─────────────────────────────────────────────────────────────────
+        # VALIDATION
+        # ─────────────────────────────────────────────────────────────────
         if not fullname or not fullname.strip():
             raise ValueError("Họ tên không được để trống")
         if not email or not email.strip():
@@ -286,16 +291,9 @@ def update_personal_info(
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", dob):
             raise ValueError("Ngày sinh phải có định dạng YYYY-MM-DD")
         
-        # Update DynamoDB
-        updated_profile = create_or_update_profile(
-            user_id=user_id,
-            email=email,
-            fullname=fullname,
-            phone=phone_normalized,
-            dob=dob
-        )
-        
-        # Cập nhật Cognito attributes
+        # ─────────────────────────────────────────────────────────────────
+        # STEP 1: Update COGNITO FIRST (Source of Truth)
+        # ─────────────────────────────────────────────────────────────────
         try:
             cognito = get_cognito_client()
             cognito.admin_update_user_attributes(
@@ -308,10 +306,28 @@ def update_personal_info(
                     {"Name": "birthdate", "Value": dob},
                 ]
             )
-            logger.info(f"[Cognito] Cập nhật attributes: {user_id}")
+            logger.info(f"[Cognito] ✅ Updated attributes for {user_id}")
         except ClientError as e:
-            logger.warning(f"[Cognito] Cảnh báo cập nhật attributes: {e}")
-            # Không fail, vì DynamoDB đã được update
+            # FAIL IMMEDIATELY - don't touch DynamoDB if Cognito fails
+            logger.error(f"[Cognito] ❌ Failed to update: {e}")
+            raise Exception(f"Không thể cập nhật thông tin Cognito: {str(e)}")
+        
+        # ─────────────────────────────────────────────────────────────────
+        # STEP 2: Update DYNAMODB (Cache) - Eventual Consistency
+        # ─────────────────────────────────────────────────────────────────
+        try:
+            updated_profile = create_or_update_profile(
+                user_id=user_id,
+                email=email,
+                fullname=fullname,
+                phone=phone_normalized,
+                dob=dob
+            )
+            logger.info(f"[DynamoDB] ✅ Updated profile for {user_id}")
+        except Exception as e:
+            # LOG WARNING but don't fail - Cognito already updated
+            # Next read will eventually sync
+            logger.warning(f"[DynamoDB] ⚠️ Cache sync failed (Cognito already updated): {e}")
         
         return {
             "success": True,
@@ -320,6 +336,7 @@ def update_personal_info(
             "email": email,
             "phone": phone_normalized,
             "dob": dob,
+            "sync_status": "cognito_primary"
         }
         
     except ValueError as e:
@@ -491,3 +508,177 @@ def change_password(
     except Exception as e:
         logger.error(f"[Profile] Lỗi change password {user_id}: {e}")
         raise
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EMAIL VERIFICATION TIMEOUT - Auto-cleanup unverified users
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def cleanup_unverified_users() -> Dict[str, Any]:
+    """
+    BACKGROUND JOB: Xóa tài khoản chưa xác thực email sau khi timeout 5 phút
+    
+    Logic:
+    1. Scan DynamoDB cho users với: verification_pending_until < now AND email_verified = false
+    2. Xóa từ Cognito FIRST (nếu không có user, skip)
+    3. Xóa từ DynamoDB
+    4. Xóa S3 data (nếu có)
+    
+    Returns:
+        dict: {
+            "cleaned": int,     # số user bị xóa
+            "failed": int,      # số lỗi
+            "details": [...]    # chi tiết từng user
+        }
+    
+    Note: Được gọi bởi:
+    - Lambda trigger mỗi 1 phút (CloudWatch Events)
+    - Hoặc background task trong FastAPI
+    - Hoặc manual admin endpoint
+    """
+    
+    try:
+        logger.info("[Cleanup] Bắt đầu cleanup unverified users")
+        
+        now = datetime.utcnow()
+        cleaned_count = 0
+        failed_count = 0
+        details = []
+        
+        # ─────────────────────────────────────────────────────────────────
+        # SCAN DynamoDB: Tìm users hết timeout
+        # ─────────────────────────────────────────────────────────────────
+        table = get_dynamodb_resource().Table(USERS_TABLE)
+        
+        # Query pattern: email_verified = false AND verification_pending_until < now
+        # Note: Cần có GSI trên (email_verified, verification_pending_until) để efficient
+        # Fallback: Scan all + filter in code
+        response = table.scan(
+            FilterExpression="email_verified = :false AND attribute_exists(verification_pending_until) AND verification_pending_until < :now",
+            ExpressionAttributeValues={
+                ":false": False,
+                ":now": now.isoformat() + 'Z',  # ISO format
+            }
+        )
+        
+        unverified_users = response.get('Items', [])
+        logger.info(f"[Cleanup] Tìm thấy {len(unverified_users)} users chưa xác thực hết timeout")
+        
+        cognito = get_cognito_client()
+        
+        # ─────────────────────────────────────────────────────────────────
+        # Xóa từng user: Cognito FIRST → DynamoDB → S3
+        # ─────────────────────────────────────────────────────────────────
+        for user_data in unverified_users:
+            user_id = user_data.get('user_id')
+            email = user_data.get('email')
+            timeout_at = user_data.get('verification_pending_until')
+            
+            try:
+                # STEP 1: Xóa từ Cognito (Source of Truth)
+                try:
+                    cognito.admin_delete_user(
+                        UserPoolId=COGNITO_USERPOOL_ID,
+                        Username=email
+                    )
+                    logger.info(f"[Cognito] ✅ Deleted unverified user: {user_id} ({email})")
+                except ClientError as e:
+                    error_code = e.response['Error']['Code']
+                    if error_code == 'UserNotFoundException':
+                        logger.warning(f"[Cognito] ⚠️ User not found: {email} (may have been deleted)")
+                    else:
+                        raise e
+                
+                # STEP 2: Xóa từ DynamoDB
+                table.delete_item(Key={'user_id': user_id})
+                logger.info(f"[DynamoDB] ✅ Deleted profile: {user_id}")
+                
+                # STEP 3: Xóa S3 data (chat history, documents, uploads)
+                try:
+                    import boto3
+                    s3 = boto3.client('s3', region_name=config.AWS_DEFAULT_REGION)
+                    
+                    # Delete all user data from S3
+                    # - s3://smartdocai-storage.../chat_history/{user_id}.json
+                    # - s3://smartdocai-storage.../processed_files/{user_id}.json
+                    # - s3://smartdocai-storage.../avatars/{user_id}/...
+                    # - s3://smartdocai-storage.../uploads/{user_id}/...
+                    
+                    keys_to_delete = [
+                        f'chat_history/{user_id}.json',
+                        f'processed_files/{user_id}.json',
+                    ]
+                    
+                    for key in keys_to_delete:
+                        try:
+                            s3.delete_object(Bucket=config.S3_BUCKET, Key=key)
+                            logger.info(f"[S3] ✅ Deleted: {key}")
+                        except Exception as e:
+                            logger.warning(f"[S3] ⚠️ Failed to delete {key}: {e}")
+                    
+                    # List and delete all user directory contents (avatars, uploads, etc)
+                    try:
+                        paginator = s3.get_paginator('list_objects_v2')
+                        for prefix in [f'avatars/{user_id}/', f'uploads/{user_id}/']:
+                            for page in paginator.paginate(Bucket=config.S3_BUCKET, Prefix=prefix):
+                                if 'Contents' in page:
+                                    for obj in page['Contents']:
+                                        s3.delete_object(Bucket=config.S3_BUCKET, Key=obj['Key'])
+                                        logger.info(f"[S3] ✅ Deleted: {obj['Key']}")
+                    except Exception as e:
+                        logger.warning(f"[S3] ⚠️ Failed to delete user directories: {e}")
+                
+                except Exception as e:
+                    logger.warning(f"[S3] ⚠️ S3 cleanup error for {user_id}: {e}")
+                
+                cleaned_count += 1
+                details.append({
+                    "user_id": user_id,
+                    "email": email,
+                    "timeout_at": timeout_at,
+                    "status": "deleted",
+                })
+                
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"[Cleanup] ❌ Failed to delete user {user_id}: {e}")
+                details.append({
+                    "user_id": user_id,
+                    "email": email,
+                    "status": "failed",
+                    "error": str(e),
+                })
+        
+        result = {
+            "success": True,
+            "cleaned": cleaned_count,
+            "failed": failed_count,
+            "total": len(unverified_users),
+            "timestamp": now.isoformat(),
+            "details": details,
+        }
+        
+        logger.info(f"[Cleanup] ✅ Hoàn thành: cleaned={cleaned_count}, failed={failed_count}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"[Cleanup] ❌ Fatal error: {e}")
+        raise
+
+
+def schedule_cleanup_unverified_users():
+    """
+    Helper: Schedule cleanup job (được gọi bởi FastAPI startup)
+    Có thể dùng APScheduler hoặc background tasks
+    
+    Usage:
+        # In FastAPI startup
+        from apscheduler.schedulers.background import BackgroundScheduler
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(schedule_cleanup_unverified_users, 'interval', minutes=1)
+        scheduler.start()
+    """
+    try:
+        cleanup_unverified_users()
+    except Exception as e:
+        logger.error(f"[Cleanup] Scheduled task error: {e}")
