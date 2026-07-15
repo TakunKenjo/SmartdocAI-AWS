@@ -14,7 +14,7 @@ import time
 import shutil
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
@@ -87,24 +87,48 @@ state = {
 
 # --- PERSISTENCE HELPERS ---
 
-def save_processed_files(files_info: list):
+def save_processed_files(files_info: list, user_id: str = None):
+    """Lưu danh sách file đã xử lý riêng per-user"""
     if config.IS_LAMBDA:
-        s3_storage.save_json(files_info, config.S3_KEY_PROCESSED_FILES)
+        # Per-user processed files in S3
+        if user_id:
+            key = f"processed_files/{user_id}.json"
+        else:
+            key = config.S3_KEY_PROCESSED_FILES
+        s3_storage.save_json(files_info, key)
     else:
         try:
             os.makedirs(_PERSIST_DIR, exist_ok=True)
-            with open(_FILES_PATH, "w", encoding="utf-8") as f:
+            # Per-user processed files in local filesystem
+            if user_id:
+                path = os.path.join(_PERSIST_DIR, f"processed_files_{user_id}.json")
+            else:
+                path = _FILES_PATH
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(files_info, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"Lỗi khi lưu processed_files: {e}")
 
-def load_processed_files() -> list:
+def load_processed_files(user_id: str = None) -> list:
+    """Tải danh sách file đã xử lý riêng per-user"""
     if config.IS_LAMBDA:
-        return s3_storage.load_json(config.S3_KEY_PROCESSED_FILES, default=[])
-    if not os.path.exists(_FILES_PATH):
+        # Per-user processed files from S3
+        if user_id:
+            key = f"processed_files/{user_id}.json"
+        else:
+            key = config.S3_KEY_PROCESSED_FILES
+        return s3_storage.load_json(key, default=[])
+    
+    # Per-user processed files from local filesystem
+    if user_id:
+        path = os.path.join(_PERSIST_DIR, f"processed_files_{user_id}.json")
+    else:
+        path = _FILES_PATH
+    
+    if not os.path.exists(path):
         return []
     try:
-        with open(_FILES_PATH, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Lỗi khi tải processed_files: {e}")
@@ -228,19 +252,14 @@ def get_app_config():
         _config_loaded = True
 
 
-def get_processed_files():
-    global _files_loaded
-    if not _files_loaded or config.IS_LAMBDA:
-        saved_files = load_processed_files()
-        if saved_files:
-            state["processed_files"] = saved_files
-            state["total_chunks"] = sum(f.get("chunks", 0) for f in saved_files)
-            logger.info(f"Đã khôi phục {len(saved_files)} file, {state['total_chunks']} chunks từ disk/S3.")
-        else:
-            state["processed_files"] = []
-            state["total_chunks"] = 0
-        _files_loaded = True
-    return state["processed_files"]
+def get_processed_files(user_id: str = None):
+    """Lấy danh sách file đã xử lý riêng per-user - luôn tải mới từ storage (không cache global)"""
+    saved_files = load_processed_files(user_id)
+    if saved_files:
+        total_chunks = sum(f.get("chunks", 0) for f in saved_files)
+        logger.info(f"Khôi phục {len(saved_files)} file, {total_chunks} chunks cho user {user_id}")
+        return saved_files
+    return []
 
 
 def get_chat_history(user_id: str = None):
@@ -402,12 +421,20 @@ class DeleteDocumentRequest(BaseModel):
 
 
 @app.get("/api/status")
-def get_status():
+def get_status(authorization: str = Header(None)):
+    """Get status - shows per-user file counts"""
     from modules.rag_chain import check_aws_connection
+
+    user_id = None
+    if authorization:
+        try:
+            user_id = extract_user_id_from_token(authorization)
+        except HTTPException:
+            pass
 
     connection = check_aws_connection()
     state["llm_status"] = connection
-    processed_files = get_processed_files()
+    processed_files = get_processed_files(user_id)
 
     return {
          "online": connection,
@@ -420,7 +447,7 @@ def get_status():
 
         "total_files": len(processed_files),
         "total_pages": sum(f.get("pages", 0) for f in processed_files),
-        "total_chunks": state["total_chunks"],
+        "total_chunks": sum(f.get("chunks", 0) for f in processed_files),
 
         "model_ready": True
     }
@@ -459,8 +486,15 @@ def update_config(data: ConfigUpdate):
 
 
 @app.get("/api/files")
-def get_files():
-    return get_processed_files()
+def get_files(authorization: str = Header(None)):
+    """Get user's documents - per-user"""
+    user_id = None
+    if authorization:
+        try:
+            user_id = extract_user_id_from_token(authorization)
+        except HTTPException:
+            pass
+    return get_processed_files(user_id)
 
 @app.post("/api/upload-url")
 def get_upload_url(data: UploadUrlRequest):
@@ -483,9 +517,17 @@ def get_upload_url(data: UploadUrlRequest):
 
 
 @app.post("/api/process")
-def process_document(data: ProcessDocumentRequest):
+def process_document(data: ProcessDocumentRequest, authorization: str = Header(None)):
+    """Process document - per-user"""
     from modules.vector_store import create_vector_store, save_vector_store, create_bm25_retriever
     from modules.document_processor import extract_text_from_pdf, extract_text_from_docx, split_documents
+
+    user_id = None
+    if authorization:
+        try:
+            user_id = extract_user_id_from_token(authorization)
+        except HTTPException:
+            pass
 
     if not data.filename or not data.s3_key:
         raise HTTPException(status_code=400, detail="Filename và s3_key là bắt buộc.")
@@ -549,7 +591,7 @@ def process_document(data: ProcessDocumentRequest):
         if state["hybrid_enabled"]:
             create_bm25_retriever(state["raw_documents"])
 
-        save_processed_files(state["processed_files"])
+        save_processed_files(state["processed_files"], user_id)
 
     return {
         "status": "success",
@@ -559,13 +601,21 @@ def process_document(data: ProcessDocumentRequest):
 
 
 @app.post("/api/delete-document")
-def delete_document(data: DeleteDocumentRequest):
+def delete_document(data: DeleteDocumentRequest, authorization: str = Header(None)):
+    """Delete user's document - per-user"""
+    user_id = None
+    if authorization:
+        try:
+            user_id = extract_user_id_from_token(authorization)
+        except HTTPException:
+            pass
+    
     filename = data.filename
     if not filename:
         raise HTTPException(status_code=400, detail="Filename là bắt buộc.")
 
     # 1. Tải danh sách file và vector store hiện tại
-    processed_files = get_processed_files()
+    processed_files = get_processed_files(user_id)
     get_vector_store()
 
     # 2. Định vị file tương ứng để lấy s3_key
@@ -613,7 +663,7 @@ def delete_document(data: DeleteDocumentRequest):
         state["vector_store"] = None
 
     # 7. Lưu lại processed_files.json
-    save_processed_files(state["processed_files"])
+    save_processed_files(state["processed_files"], user_id)
 
     # 8. Cập nhật active_file_filter nếu file bị xóa đang nằm trong bộ lọc
     get_app_config()
@@ -873,34 +923,47 @@ def clear_history(authorization: str = Header(None)):
 
 
 @app.post("/api/clear-documents")
-def clear_documents():
+def clear_documents(authorization: str = Header(None)):
+    """Clear user's documents - per-user"""
     from modules.vector_store import clear_vector_store
+    
+    user_id = None
+    if authorization:
+        try:
+            user_id = extract_user_id_from_token(authorization)
+        except HTTPException:
+            pass
+    
     clear_vector_store()
     
-    # Xóa file persist local
-    for path in [_FILES_PATH, _HISTORY_PATH, _CONFIG_PATH]:
-        try:
-            if os.path.exists(path):
-                os.remove(path)
-        except Exception as e:
-            logger.error(f"Lỗi khi xóa {path} local: {e}")
+    # Xóa file persist local (per-user)
+    if user_id:
+        local_file_path = os.path.join(_PERSIST_DIR, f"processed_files_{user_id}.json")
+    else:
+        local_file_path = _FILES_PATH
+    
+    try:
+        if os.path.exists(local_file_path):
+            os.remove(local_file_path)
+    except Exception as e:
+        logger.error(f"Lỗi khi xóa {local_file_path} local: {e}")
 
-    # Xóa file persist trên S3 để đồng bộ hóa serverless
+    # Xóa file persist trên S3 để đồng bộ hóa serverless (per-user)
     if config.IS_LAMBDA:
-        for s3_key in [config.S3_KEY_PROCESSED_FILES, config.S3_KEY_CHAT_HISTORY, config.S3_KEY_SEARCH_CONFIG]:
-            try:
-                s3_storage.delete_key(s3_key)
-            except Exception as e:
-                logger.error(f"Lỗi khi xóa {s3_key} trên S3: {e}")
+        if user_id:
+            s3_key = f"processed_files/{user_id}.json"
+        else:
+            s3_key = config.S3_KEY_PROCESSED_FILES
+        
+        try:
+            s3_storage.delete_key(s3_key)
+        except Exception as e:
+            logger.error(f"Lỗi khi xóa {s3_key} trên S3: {e}")
 
-    global _files_loaded, _history_loaded
-    _files_loaded = True
-    _history_loaded = True
     state["vector_store"] = None
     state["processed_files"] = []
     state["total_chunks"] = 0
     state["raw_documents"] = []
-    state["chat_history"] = []
     state["active_file_filter"] = []
     
     return {"status": "success"}
