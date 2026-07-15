@@ -182,13 +182,19 @@ def register_user(email, password, fullname, phone, dob):
         # ───────────────────────────────────────────────────────────────────
         # [3/3] Tạo profile trong DynamoDB
         # ───────────────────────────────────────────────────────────────────
+        logger.info(f"[Register] [DEBUG] Getting DynamoDB resource...")
         dynamodb = get_dynamodb_resource()
+        logger.info(f"[Register] [DEBUG] DynamoDB resource OK")
+        
+        logger.info(f"[Register] [DEBUG] Getting table: {DYNAMODB_USERS_TABLE}")
         table = dynamodb.Table(DYNAMODB_USERS_TABLE)
+        logger.info(f"[Register] [DEBUG] Table object created")
         
         timestamp = get_timestamp()
         # Calculate verification timeout: 5 minutes from now
         verification_pending_until = (datetime.utcnow() + timedelta(minutes=5)).replace(microsecond=0).isoformat() + 'Z'
         
+        logger.info(f"[Register] [DEBUG] Calling table.put_item() with user_id={user_id}")
         table.put_item(
             Item={
                 'user_id': user_id,
@@ -218,7 +224,6 @@ def register_user(email, password, fullname, phone, dob):
                 },
             }
         )
-        
         logger.info(f"[Register] ✅ DynamoDB profile created: user_id={user_id}")
         logger.info(f"[Register] Verification timeout set to {verification_pending_until}")
         
