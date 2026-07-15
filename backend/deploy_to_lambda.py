@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 SmartDocAI Backend Deployment Script
 Tự động: Build Docker -> Push ECR -> Update Lambda
@@ -8,6 +9,8 @@ Usage:
 """
 
 import os
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
 import sys
 import subprocess
 import boto3
