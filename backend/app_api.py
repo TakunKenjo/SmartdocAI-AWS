@@ -960,6 +960,269 @@ async def confirm_signup(request: ConfirmSignUpRequest):
 
 
 # ════════════════════════════════════════════════════════════════════════════════
+# TEST ENDPOINTS (LOCAL ONLY) — Cho phép test mà không cần email verification
+# ════════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/auth/test-confirm/{email}")
+def test_confirm_user(email: str):
+    """
+    [TEST ONLY - LOCAL] POST /api/auth/test-confirm/{email}
+    
+    Tự động xác thực user mà không cần OTP.
+    Chỉ hoạt động ở môi trường local (ENVIRONMENT=local).
+    
+    Purpose: Tăng tốc độ testing, không cần check email
+    
+    Example:
+    POST /api/auth/test-confirm/test@example.com
+    Response: {"success": true, "message": "User xác thực thành công"}
+    """
+    # Check if running locally
+    environment = os.getenv("ENVIRONMENT", "local")
+    if environment not in ["local", "dev"]:
+        logger.warning(f"[Test] ❌ Unauthorized: test endpoint called in {environment}")
+        raise HTTPException(status_code=403, detail="Test endpoint chỉ khả dụng ở local")
+    
+    try:
+        import boto3
+        from botocore.exceptions import ClientError
+        
+        logger.info(f"[Test] Confirming user: {email}")
+        
+        cognito = boto3.client("cognito-idp", region_name=config.AWS_DEFAULT_REGION)
+        cognito_pool_id = os.getenv("COGNITO_USERPOOL_ID", "us-east-1_3oq5wIiuu")
+        
+        # Step 1: Confirm user directly (bypass OTP)
+        cognito.admin_confirm_sign_up(
+            UserPoolId=cognito_pool_id,
+            Username=email
+        )
+        
+        logger.info(f"[Test] ✅ User confirmed: {email}")
+        
+        return {
+            "success": True,
+            "message": f"User {email} xác thực thành công (test mode)"
+        }
+        
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        logger.error(f"[Test] ❌ Cognito error: {error_code}")
+        raise HTTPException(status_code=400, detail=f"Lỗi xác thực: {error_code}")
+    except Exception as e:
+        logger.error(f"[Test] ❌ Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/auth/test-login-local")
+def test_login_local(request: ConfirmSignUpRequest):
+    """
+    [TEST ONLY - LOCAL] POST /api/auth/test-login-local
+    
+    Dummy login cho testing local. Lookup actual Cognito sub.
+    """
+    environment = os.getenv("ENVIRONMENT", "local")
+    if environment not in ["local", "dev"]:
+        raise HTTPException(status_code=403, detail="Chỉ local")
+    
+    try:
+        import json
+        import base64
+        import hmac
+        import hashlib
+        from datetime import datetime, timedelta
+        import boto3
+        from botocore.exceptions import ClientError
+        
+        email = request.email
+        
+        # Look up the Cognito user to get the real sub
+        cognito = boto3.client("cognito-idp", region_name=config.AWS_DEFAULT_REGION)
+        cognito_pool_id = os.getenv("COGNITO_USERPOOL_ID", "us-east-1_3oq5wIiuu")
+        
+        try:
+            user_response = cognito.admin_get_user(
+                UserPoolId=cognito_pool_id,
+                Username=email
+            )
+            # Extract sub from Attributes
+            sub = None
+            for attr in user_response['UserAttributes']:
+                if attr['Name'] == 'sub':
+                    sub = attr['Value']
+                    break
+            
+            if not sub:
+                raise Exception("No sub found in user attributes")
+            
+            logger.info(f"[Test-Local] Found user {email} with sub={sub}")
+        except ClientError as e:
+            logger.error(f"[Test-Local] Error looking up user: {e}")
+            raise HTTPException(status_code=404, detail=f"User {email} not found in Cognito")
+        
+        # Create a fake JWT token with the real Cognito sub
+        header = {"alg": "HS256", "typ": "JWT"}
+        payload = {
+            "sub": sub,
+            "email": email,
+            "email_verified": True,
+            "iss": "http://localhost",
+            "aud": "local",
+            "token_use": "id",
+            "auth_time": int(datetime.now().timestamp()),
+            "exp": int((datetime.now() + timedelta(hours=1)).timestamp()),
+            "iat": int(datetime.now().timestamp()),
+        }
+        
+        def b64url_encode(data):
+            return base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip('=')
+        
+        header_enc = b64url_encode(header)
+        payload_enc = b64url_encode(payload)
+        
+        # Sign with a dummy key
+        signature = hmac.new(
+            b"local-test-secret-key",
+            f"{header_enc}.{payload_enc}".encode(),
+            hashlib.sha256
+        ).digest()
+        signature_enc = base64.urlsafe_b64encode(signature).decode().rstrip('=')
+        
+        token = f"{header_enc}.{payload_enc}.{signature_enc}"
+        
+        logger.info(f"[Test-Local] Generated dummy token for {email} (sub={sub})")
+        
+        return {
+            "success": True,
+            "user_id": sub,
+            "email": email,
+            "token": token,
+            "message": "Dummy token (local test only)"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Test-Local] Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/auth/test-login")
+def test_login_user(request: ConfirmSignUpRequest):
+    """
+    [TEST ONLY - LOCAL] POST /api/auth/test-login
+    
+    Đăng nhập backend test (bypass frontend Cognito SDK).
+    Chỉ hoạt động ở môi trường local.
+    
+    Purpose: Test authentication flow mà không cần frontend
+    
+    Request:
+    {
+        "email": "test@example.com",
+        "confirmation_code": "Pass123"  (← dùng làm password)
+    }
+    
+    Response: {"success": true, "token": "eyJhbGc...", "user_id": "..."}
+    """
+    environment = os.getenv("ENVIRONMENT", "local")
+    if environment not in ["local", "dev"]:
+        logger.warning(f"[Test] ❌ Unauthorized: test login called in {environment}")
+        raise HTTPException(status_code=403, detail="Test endpoint chỉ khả dụng ở local")
+    
+    try:
+        import boto3
+        from botocore.exceptions import ClientError
+        
+        email = request.email
+        password = request.confirmation_code  # Reuse field for password
+        
+        logger.info(f"[Test] Login attempt: {email}")
+        logger.info(f"[Test] Password length: {len(password)}")
+        
+        cognito = boto3.client("cognito-idp", region_name=config.AWS_DEFAULT_REGION)
+        cognito_pool_id = os.getenv("COGNITO_USERPOOL_ID", "us-east-1_3oq5wIiuu")
+        cognito_client_id = os.getenv("COGNITO_CLIENT_ID", "45mh0kpksbv6tnqo0dou4sgi0")
+        
+        # First check if user exists and their status
+        try:
+            user_info = cognito.admin_get_user(
+                UserPoolId=cognito_pool_id,
+                Username=email
+            )
+            logger.info(f"[Test] User found. Status: {user_info['UserStatus']}")
+        except Exception as e:
+            logger.error(f"[Test] Can't get user info: {e}")
+        
+        # AdminInitiateAuth - backend login
+        try:
+            logger.info(f"[Test] Calling admin_initiate_auth...")
+            logger.info(f"[Test] Pool: {cognito_pool_id[:20]}...")
+            logger.info(f"[Test] Client: {cognito_client_id[:20]}...")
+            
+            response = cognito.admin_initiate_auth(
+                UserPoolId=cognito_pool_id,
+                ClientId=cognito_client_id,
+                AuthFlow="ADMIN_NO_SRP_AUTH",
+                AuthParameters={
+                    "USERNAME": email,
+                    "PASSWORD": password
+                }
+            )
+            logger.info(f"[Test] Auth response: {list(response.keys())}")
+            
+            tokens = response.get("AuthenticationResult", {})
+            id_token = tokens.get("IdToken")
+            access_token = tokens.get("AccessToken")
+            
+            if not id_token:
+                raise Exception("No IdToken in response")
+            
+            # Decode JWT to get user_id (sub)
+            import json
+            import base64
+            
+            parts = id_token.split(".")
+            payload = parts[1]
+            padding = 4 - len(payload) % 4
+            if padding != 4:
+                payload += "=" * padding
+            
+            decoded = base64.urlsafe_b64decode(payload)
+            claims = json.loads(decoded)
+            user_id = claims.get("sub")
+            
+            logger.info(f"[Test] ✅ Login success: {email}, user_id={user_id}")
+            
+            return {
+                "success": True,
+                "user_id": user_id,
+                "email": email,
+                "token": id_token,
+                "access_token": access_token,
+                "message": "Đăng nhập thành công (test mode)"
+            }
+            
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            error_message = e.response['Error']['Message']
+            logger.error(f"[Test] ❌ Cognito error: {error_code} - {error_message}")
+            
+            if error_code == "UserNotConfirmedException":
+                raise HTTPException(status_code=400, detail="User chưa xác thực email")
+            elif error_code == "NotAuthorizedException":
+                raise HTTPException(status_code=401, detail="Email hoặc mật khẩu sai")
+            else:
+                raise HTTPException(status_code=400, detail=f"Lỗi Cognito: {error_code} - {error_message}")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Test] ❌ Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ════════════════════════════════════════════════════════════════════════════════
 # PROFILE ENDPOINTS — Quản lý hồ sơ người dùng
 # ════════════════════════════════════════════════════════════════════════════════
 
