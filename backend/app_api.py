@@ -1256,12 +1256,15 @@ def change_password(
 
 
 # Phục vụ file tĩnh của frontend React ở root
-# Đảm bảo thư mục tồn tại trước khi mount: "static/libs" bị .gitignore nên khi
-# CodePipeline clone code sạch từ GitHub để build Docker image, thư mục "static"
-# có thể không tồn tại -> StaticFiles sẽ raise RuntimeError ngay lúc import module
-# và làm sập Lambda init. Tạo thư mục rỗng nếu thiếu để tránh crash.
-os.makedirs("static", exist_ok=True)
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+# Lưu ý: filesystem của Lambda là read-only (trừ /tmp), nên KHÔNG thể tự tạo
+# thư mục "static" bằng os.makedirs() lúc runtime nếu nó thiếu - phải đảm bảo
+# thư mục này tồn tại sẵn trong image ngay từ build time (xem Dockerfile: RUN
+# mkdir -p static). Ở đây chỉ kiểm tra để tránh crash cứng nếu vì lý do nào đó
+# thư mục vẫn thiếu (ví dụ chạy local không qua Docker).
+if os.path.isdir("static"):
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
+else:
+    logger.warning("[Static] Thư mục 'static' không tồn tại - bỏ qua việc mount static files.")
 
 # Wrapper handler cho AWS Lambda (dùng cho request HTTP qua API Gateway)
 _mangum_handler = Mangum(app)
