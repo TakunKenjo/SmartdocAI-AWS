@@ -20,7 +20,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from mangum import Mangum
-from apscheduler.schedulers.background import BackgroundScheduler
 
 # Thêm root directory vào path để import các modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -53,6 +52,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """
+    Bắt TẤT CẢ exception chưa xử lý và trả về JSONResponse thay vì để nó
+    bubble ra ngoài ASGI app. Lý do: Starlette's ServerErrorMiddleware nằm
+    NGOÀI CORSMiddleware, nên exception chưa bắt sẽ trả lỗi 500 KHÔNG có
+    CORS header -> trình duyệt hiện nhầm thành "CORS policy blocked" thay vì
+    lỗi 500 thật, gây khó debug. Handler này đảm bảo response luôn đi qua
+    CORSMiddleware bình thường dù có lỗi gì xảy ra.
+    """
+    logger.error(f"[UnhandledException] {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Lỗi hệ thống: {str(exc)}"},
+    )
 
 # Thư mục lưu trữ
 _PERSIST_DIR = config.VECTORSTORE_DIR
@@ -242,8 +258,6 @@ def load_app_config():
 # --- INIT STATE ---
 
 _config_loaded = False
-_files_loaded = False
-_history_loaded = False
 
 
 def get_app_config():
@@ -275,97 +289,29 @@ def get_chat_history(user_id: str = None):
     return state["chat_history"]
 
 
+def get_user_index_name(user_id: str = None) -> str:
+    """Tính tên/path FAISS index riêng cho từng user, tránh dùng chung 1 index toàn cục"""
+    uid = user_id or "anonymous"
+    return f"{uid}/{config.FAISS_INDEX_NAME}"
+
+
 def get_vector_store(user_id: str = None) -> Optional[Any]:
-    """Get vector store - per-user. Rebuilds from user's documents each request"""
-    # Load user's processed files
-    latest_files = get_processed_files(user_id)
-    
-    if not latest_files:
-        return None
-    
-    # For per-user isolation: rebuild vector store from user's documents each time
-    # This ensures User A's documents don't leak to User B's queries
+    """Get vector store - luôn load đúng FAISS index riêng của user này (per-user path)"""
     try:
         from modules.vector_store import load_vector_store
-        from modules.document_processor import Document
-        
-        # Load all user's documents from S3/disk
-        raw_docs = []
-        for file_info in latest_files:
-            s3_key = file_info.get("s3_key")
-            if s3_key:
-                # Load document chunks from storage
-                # Since we don't have per-user document storage yet,
-                # we'll need to rebuild from uploaded files
-                pass
-        
-        # For MVP: rebuild from cache if available, else load from S3
-        logger.info(f"Loading vector store for user {user_id}...")
-        saved_store = load_vector_store(force_download=False)
-        
+        index_name = get_user_index_name(user_id)
+        logger.info(f"Loading vector store for user {user_id} (index={index_name})...")
+        saved_store = load_vector_store(index_name=index_name, force_download=False)
+
         if saved_store is not None:
-            logger.info(f"Loaded vector store with {len(latest_files)} files for user {user_id}")
-            return saved_store
+            logger.info(f"Loaded vector store for user {user_id}")
         else:
-            logger.warning(f"No vector store found for user {user_id}")
-            return None
+            logger.info(f"No vector store found for user {user_id}")
+        return saved_store
     except Exception as e:
         logger.error(f"Error loading vector store for user {user_id}: {e}")
         return None
 
-
-# ═══════════════════════════════════════════════════════════════════
-# BACKGROUND SCHEDULER: Cleanup unverified users
-# ═══════════════════════════════════════════════════════════════════
-
-scheduler = None
-
-def init_scheduler():
-    """
-    Initialize APScheduler for background jobs.
-    Currently running cleanup_unverified_users every 1 minute.
-    
-    See SCHEDULER_SETUP.md for migration guide to CloudWatch.
-    """
-    global scheduler
-    try:
-        from modules.profile_service import cleanup_unverified_users
-        
-        scheduler = BackgroundScheduler()
-        
-        # Job: Cleanup unverified users every 1 minute
-        scheduler.add_job(
-            cleanup_unverified_users,
-            'interval',
-            minutes=1,
-            id='cleanup_unverified_users',
-            name='Cleanup unverified users (5-min timeout)',
-            misfire_grace_time=60,
-            max_instances=1  # Prevent multiple concurrent runs
-        )
-        
-        scheduler.start()
-        logger.info("✅ Background Scheduler initialized")
-        logger.info("   └─ Job: cleanup_unverified_users (every 1 minute)")
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize scheduler: {e}")
-        raise
-
-
-@app.on_event("startup")
-def startup_event():
-    logger.info("Khởi động API server SmartDocAI...")
-    init_scheduler()
-
-
-@app.on_event("shutdown")
-def shutdown_event():
-    """Stop scheduler on shutdown"""
-    global scheduler
-    if scheduler and scheduler.running:
-        scheduler.shutdown()
-        logger.info("🛑 Background Scheduler stopped")
 
 # --- UTILITIES ---
 
@@ -476,12 +422,7 @@ def get_status(authorization: str = Header(None)):
     """Get status - shows per-user file counts"""
     from modules.rag_chain import check_aws_connection
 
-    user_id = None
-    if authorization:
-        try:
-            user_id = extract_user_id_from_token(authorization)
-        except HTTPException:
-            pass
+    user_id = require_user_id(authorization)
 
     connection = check_aws_connection()
     state["llm_status"] = connection
@@ -539,21 +480,18 @@ def update_config(data: ConfigUpdate):
 @app.get("/api/files")
 def get_files(authorization: str = Header(None)):
     """Get user's documents - per-user"""
-    user_id = None
-    if authorization:
-        try:
-            user_id = extract_user_id_from_token(authorization)
-        except HTTPException:
-            pass
+    user_id = require_user_id(authorization)
     return get_processed_files(user_id)
 
 @app.post("/api/upload-url")
-def get_upload_url(data: UploadUrlRequest):
+def get_upload_url(data: UploadUrlRequest, authorization: str = Header(None)):
+    user_id = require_user_id(authorization)
+
     if not data.filename:
         raise HTTPException(status_code=400, detail="Filename là bắt buộc.")
     
     clean_filename = os.path.basename(data.filename)
-    s3_key = f"uploads/{clean_filename}"
+    s3_key = f"uploads/{user_id}/{clean_filename}"
     upload_url = s3_storage.generate_presigned_upload_url(s3_key, data.content_type)
     
     if not upload_url:
@@ -570,15 +508,10 @@ def get_upload_url(data: UploadUrlRequest):
 @app.post("/api/process")
 def process_document(data: ProcessDocumentRequest, authorization: str = Header(None)):
     """Process document - per-user"""
-    from modules.vector_store import create_vector_store, save_vector_store, create_bm25_retriever
+    from modules.vector_store import create_vector_store, save_vector_store, create_bm25_retriever, get_documents_from_vector_store
     from modules.document_processor import extract_text_from_pdf, extract_text_from_docx, split_documents
 
-    user_id = None
-    if authorization:
-        try:
-            user_id = extract_user_id_from_token(authorization)
-        except HTTPException:
-            pass
+    user_id = require_user_id(authorization)
 
     if not data.filename or not data.s3_key:
         raise HTTPException(status_code=400, detail="Filename và s3_key là bắt buộc.")
@@ -600,16 +533,14 @@ def process_document(data: ProcessDocumentRequest, authorization: str = Header(N
         if not success:
             raise HTTPException(status_code=404, detail=f"Không tìm thấy file {data.s3_key} trên S3.")
 
-    # Tải danh sách file và vector store hiện tại trước khi xử lý để thêm/ghi đè tài liệu mới
-    get_processed_files(user_id)
-    get_vector_store(user_id)
+    # Tải danh sách file & documents hiện có CỦA ĐÚNG USER NÀY (biến cục bộ, không dùng state toàn cục)
+    processed_files = get_processed_files(user_id)
+    existing_vector_store = get_vector_store(user_id)
+    raw_documents = get_documents_from_vector_store(existing_vector_store)
 
     # Kiểm tra nếu file đã tồn tại, xóa dữ liệu cũ của file đó trước để tránh bị trùng lặp khi ghi đè
-    state["processed_files"] = [f for f in state["processed_files"] if f["name"] != data.filename]
-    state["raw_documents"] = [doc for doc in state["raw_documents"] if doc.metadata.get("source") != data.filename]
-
-    global _files_loaded
-    _files_loaded = True
+    processed_files = [f for f in processed_files if f["name"] != data.filename]
+    raw_documents = [doc for doc in raw_documents if doc.metadata.get("source") != data.filename]
 
     if file_ext == ".docx":
         raw_docs = extract_text_from_docx(local_file_path, source_name=data.filename)
@@ -625,55 +556,54 @@ def process_document(data: ProcessDocumentRequest, authorization: str = Header(N
         chunk_overlap=state["chunk_overlap"]
     )
 
+    total_chunks = sum(f.get("chunks", 0) for f in processed_files)
+
     if file_chunks:
-        # Add user_id to document metadata for per-user isolation
+        # Gắn user_id vào metadata để truy vết (không dùng để lọc nữa vì mỗi user đã có index riêng)
         for doc in file_chunks:
             if not doc.metadata:
                 doc.metadata = {}
-            doc.metadata["user_id"] = user_id or "global"
-        
-        state["raw_documents"].extend(file_chunks)
-        state["processed_files"].append({
+            doc.metadata["user_id"] = user_id
+
+        raw_documents.extend(file_chunks)
+        processed_files.append({
             "name": data.filename,
             "chunks": len(file_chunks),
             "pages": len(raw_docs),
             "s3_key": data.s3_key
         })
-        state["total_chunks"] = sum(f.get("chunks", 0) for f in state["processed_files"])
+        total_chunks = sum(f.get("chunks", 0) for f in processed_files)
 
-        vector_store = create_vector_store(state["raw_documents"])
-        state["vector_store"] = vector_store
-        save_vector_store(vector_store)
+        vector_store = create_vector_store(raw_documents)
+        save_vector_store(vector_store, index_name=get_user_index_name(user_id))
 
         if state["hybrid_enabled"]:
-            create_bm25_retriever(state["raw_documents"])
+            create_bm25_retriever(raw_documents, user_id=user_id)
 
-        save_processed_files(state["processed_files"], user_id)
+        save_processed_files(processed_files, user_id)
 
     return {
         "status": "success",
-        "processed_files": state["processed_files"],
-        "total_chunks": state["total_chunks"]
+        "processed_files": processed_files,
+        "total_chunks": total_chunks
     }
 
 
 @app.post("/api/delete-document")
 def delete_document(data: DeleteDocumentRequest, authorization: str = Header(None)):
     """Delete user's document - per-user"""
-    user_id = None
-    if authorization:
-        try:
-            user_id = extract_user_id_from_token(authorization)
-        except HTTPException:
-            pass
-    
+    from modules.vector_store import create_vector_store, save_vector_store, create_bm25_retriever, clear_vector_store, get_documents_from_vector_store
+
+    user_id = require_user_id(authorization)
+
     filename = data.filename
     if not filename:
         raise HTTPException(status_code=400, detail="Filename là bắt buộc.")
 
-    # 1. Tải danh sách file và vector store hiện tại
+    # 1. Tải danh sách file và vector store hiện tại CỦA ĐÚNG USER NÀY
     processed_files = get_processed_files(user_id)
-    get_vector_store(user_id)
+    existing_vector_store = get_vector_store(user_id)
+    raw_documents = get_documents_from_vector_store(existing_vector_store)
 
     # 2. Định vị file tương ứng để lấy s3_key
     target_file = None
@@ -701,26 +631,23 @@ def delete_document(data: DeleteDocumentRequest, authorization: str = Header(Non
         except Exception as e:
             logger.error(f"Lỗi khi xóa local file {local_file_path}: {e}")
 
-    # 5. Loại bỏ các chunks liên quan trong state["raw_documents"] và cập nhật processed_files
-    state["processed_files"] = [f for f in processed_files if f["name"] != filename]
-    state["raw_documents"] = [doc for doc in state["raw_documents"] if doc.metadata.get("source") != filename]
-    state["total_chunks"] = sum(f.get("chunks", 0) for f in state["processed_files"])
+    # 5. Loại bỏ các chunks liên quan và cập nhật processed_files (biến cục bộ, per-user)
+    processed_files = [f for f in processed_files if f["name"] != filename]
+    raw_documents = [doc for doc in raw_documents if doc.metadata.get("source") != filename]
+    total_chunks = sum(f.get("chunks", 0) for f in processed_files)
 
-    # 6. Cập nhật lại Vector Store
-    if state["raw_documents"]:
-        from modules.vector_store import create_vector_store, save_vector_store, create_bm25_retriever
-        new_vs = create_vector_store(state["raw_documents"])
-        state["vector_store"] = new_vs
-        save_vector_store(new_vs)
+    # 6. Cập nhật lại Vector Store CỦA ĐÚNG USER NÀY (không đụng tới user khác)
+    index_name = get_user_index_name(user_id)
+    if raw_documents:
+        new_vs = create_vector_store(raw_documents)
+        save_vector_store(new_vs, index_name=index_name)
         if state["hybrid_enabled"]:
-            create_bm25_retriever(state["raw_documents"])
+            create_bm25_retriever(raw_documents, user_id=user_id)
     else:
-        from modules.vector_store import clear_vector_store
-        clear_vector_store()
-        state["vector_store"] = None
+        clear_vector_store(index_name=index_name)
 
     # 7. Lưu lại processed_files.json
-    save_processed_files(state["processed_files"], user_id)
+    save_processed_files(processed_files, user_id)
 
     # 8. Cập nhật active_file_filter nếu file bị xóa đang nằm trong bộ lọc
     get_app_config()
@@ -730,8 +657,8 @@ def delete_document(data: DeleteDocumentRequest, authorization: str = Header(Non
 
     return {
         "status": "success",
-        "processed_files": state["processed_files"],
-        "total_chunks": state["total_chunks"]
+        "processed_files": processed_files,
+        "total_chunks": total_chunks
     }
 
 
@@ -741,14 +668,8 @@ def delete_document(data: DeleteDocumentRequest, authorization: str = Header(Non
 async def chat_endpoint(request: ChatRequest, authorization: str = Header(None)):
     """Chat endpoint - per-user isolation"""
     
-    # Extract user_id from JWT token (for per-user chat isolation)
-    user_id = None
-    if authorization:
-        try:
-            user_id = extract_user_id_from_token(authorization)
-        except HTTPException:
-            # If token invalid, continue without user isolation
-            pass
+    # Bắt buộc phải có JWT token hợp lệ - không cho phép rơi vào nhánh "global" dùng chung
+    user_id = require_user_id(authorization)
     
     user_input = request.message
     if not user_input.strip():
@@ -770,6 +691,9 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(None))
 
     # Lưu câu hỏi của người dùng vào history (per-user isolation)
     chat_history = get_chat_history(user_id)
+    # Giữ lại lịch sử TRƯỚC câu hỏi hiện tại, dùng cho reformulate/prompt context
+    # (tránh việc câu hỏi hiện tại bị lặp lại 2 lần: 1 trong lịch sử + 1 ở phần CÂU HỎI)
+    history_before_current = list(chat_history)
     user_msg = {"role": "user", "content": user_input, "timestamp": time.time()}
     chat_history.append(user_msg)
     save_chat_history(chat_history, user_id)
@@ -787,34 +711,15 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(None))
             create_bm25_retriever,
             create_ensemble_retriever,
             get_cached_bm25_retriever,
+            get_documents_from_vector_store,
         )
         from modules.reranker import rerank_with_cross_encoder
 
-        # Lấy vector store (tải per-user từ disk/S3 nếu chưa tải)
+        # Lấy vector store (per-user, index riêng của đúng user này)
         vector_store = get_vector_store(user_id)
-        
-        # Filter raw_documents theo user_id để đảm bảo per-user isolation
-        if user_id:
-            user_documents = [
-                doc for doc in state.get("raw_documents", [])
-                if doc.metadata and doc.metadata.get("user_id") == user_id
-            ]
-        else:
-            user_documents = state.get("raw_documents", [])
-        
-        # If no vector store but have user documents, need to rebuild
-        if vector_store is None and user_documents:
-            logger.warning(f"Vector store not found for user {user_id}, but have {len(user_documents)} documents. Rebuilding...")
-            from modules.vector_store import create_vector_store
-            try:
-                vector_store = create_vector_store(user_documents)
-            except Exception as e:
-                logger.error(f"Error rebuilding vector store: {e}")
-                vector_store = None
-        
-        # Use only user's documents for this chat (override state temporarily)
-        original_raw_documents = state["raw_documents"]
-        state["raw_documents"] = user_documents
+
+        # Lấy lại documents gốc trực tiếp từ FAISS docstore của user này (không dùng state toàn cục)
+        raw_documents = get_documents_from_vector_store(vector_store)
 
         # 1. Pipeline: Self-RAG
         if state["self_rag_enabled"] and vector_store is not None:
@@ -826,6 +731,7 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(None))
                 enable_query_rewrite=state["self_rag_query_rewrite"],
                 enable_relevance_filter=state["self_rag_relevance_filter"],
                 enable_answer_grading=state["self_rag_answer_grading"],
+                file_filter=state["active_file_filter"],
             )
             result["search_mode"] = "self_rag"
             result["active_filter"] = state["active_file_filter"]
@@ -837,13 +743,14 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(None))
             result = co_rag_pipeline(
                 question=user_input,
                 vector_store=vector_store,
-                raw_documents=state["raw_documents"],
+                raw_documents=raw_documents,
                 llm=llm,
                 min_votes=config.CO_RAG_MIN_VOTES,
                 merge_strategy=state["co_rag_merge_strategy"],
                 enable_agent_semantic=state["co_rag_agent_semantic"],
                 enable_agent_keyword=state["co_rag_agent_keyword"],
                 enable_agent_conceptual=state["co_rag_agent_conceptual"],
+                file_filter=state["active_file_filter"],
             )
             result["search_mode"] = "co_rag"
             result["active_filter"] = state["active_file_filter"]
@@ -853,24 +760,24 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(None))
         else:
             retriever = None
             if state["hybrid_enabled"] and vector_store is not None:
-                bm25 = get_cached_bm25_retriever()
-                if bm25 is None and state["raw_documents"]:
-                    bm25 = create_bm25_retriever(state["raw_documents"])
+                bm25 = get_cached_bm25_retriever(user_id)
+                if bm25 is None and raw_documents:
+                    bm25 = create_bm25_retriever(raw_documents, user_id=user_id)
                 if bm25 is not None:
                     retriever = create_ensemble_retriever(vector_store, bm25)
 
             forced_docs = scan_docs_by_question_numbers(
-                user_input, state["raw_documents"]
+                user_input, raw_documents
             )
 
             result = ask_question(
                 question=user_input,
                 vector_store=vector_store,
-                chat_history=chat_history,
+                chat_history=history_before_current,
                 retriever=retriever,
                 file_filter=state["active_file_filter"],
                 forced_docs=forced_docs if forced_docs else None,
-                raw_documents=state["raw_documents"],
+                raw_documents=raw_documents,
                 reranker_enabled=state["reranker_enabled"],
             )
 
@@ -939,9 +846,6 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(None))
 
         chat_history.append(assistant_msg)
         save_chat_history(chat_history, user_id)
-        
-        # Restore original raw_documents for next request
-        state["raw_documents"] = original_raw_documents
 
         return assistant_msg
 
@@ -953,41 +857,24 @@ async def chat_endpoint(request: ChatRequest, authorization: str = Header(None))
             chat_history.pop()
             save_chat_history(chat_history, user_id)
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý câu hỏi: {str(e)}")
-    finally:
-        # Restore original raw_documents
-        if 'original_raw_documents' in locals():
-            state["raw_documents"] = original_raw_documents
 
 @app.get("/api/history")
 def get_history(authorization: str = Header(None)):
     """Get chat history - per-user"""
-    user_id = None
-    if authorization:
-        try:
-            user_id = extract_user_id_from_token(authorization)
-        except HTTPException:
-            pass
+    user_id = require_user_id(authorization)
     return get_chat_history(user_id)
 
 
 @app.post("/api/clear-history")
 def clear_history(authorization: str = Header(None)):
     """Clear user's chat history - per-user"""
-    user_id = None
-    if authorization:
-        try:
-            user_id = extract_user_id_from_token(authorization)
-        except HTTPException:
-            pass
+    user_id = require_user_id(authorization)
     
     state["chat_history"] = []
     
     # Xóa local copy
     try:
-        if user_id:
-            path = os.path.join(_PERSIST_DIR, f"chat_history_{user_id}.json")
-        else:
-            path = _HISTORY_PATH
+        path = os.path.join(_PERSIST_DIR, f"chat_history_{user_id}.json")
         
         if os.path.exists(path):
             os.remove(path)
@@ -997,10 +884,7 @@ def clear_history(authorization: str = Header(None)):
     # Xóa trên S3 để đồng bộ hóa serverless
     if config.IS_LAMBDA:
         try:
-            if user_id:
-                key = f"chat_history/{user_id}.json"
-            else:
-                key = config.S3_KEY_CHAT_HISTORY
+            key = f"chat_history/{user_id}.json"
             s3_storage.delete_key(key)
         except Exception as e:
             logger.error(f"Lỗi khi xóa chat_history trên S3: {e}")
@@ -1014,20 +898,12 @@ def clear_documents(authorization: str = Header(None)):
     """Clear user's documents - per-user"""
     from modules.vector_store import clear_vector_store
     
-    user_id = None
-    if authorization:
-        try:
-            user_id = extract_user_id_from_token(authorization)
-        except HTTPException:
-            pass
+    user_id = require_user_id(authorization)
     
-    clear_vector_store()
+    clear_vector_store(index_name=get_user_index_name(user_id))
     
     # Xóa file persist local (per-user)
-    if user_id:
-        local_file_path = os.path.join(_PERSIST_DIR, f"processed_files_{user_id}.json")
-    else:
-        local_file_path = _FILES_PATH
+    local_file_path = os.path.join(_PERSIST_DIR, f"processed_files_{user_id}.json")
     
     try:
         if os.path.exists(local_file_path):
@@ -1037,20 +913,13 @@ def clear_documents(authorization: str = Header(None)):
 
     # Xóa file persist trên S3 để đồng bộ hóa serverless (per-user)
     if config.IS_LAMBDA:
-        if user_id:
-            s3_key = f"processed_files/{user_id}.json"
-        else:
-            s3_key = config.S3_KEY_PROCESSED_FILES
+        s3_key = f"processed_files/{user_id}.json"
         
         try:
             s3_storage.delete_key(s3_key)
         except Exception as e:
             logger.error(f"Lỗi khi xóa {s3_key} trên S3: {e}")
 
-    state["vector_store"] = None
-    state["processed_files"] = []
-    state["total_chunks"] = 0
-    state["raw_documents"] = []
     state["active_file_filter"] = []
     
     return {"status": "success"}
@@ -1207,6 +1076,54 @@ def extract_user_id_from_token(authorization: str = Header(None)) -> str:
         raise HTTPException(status_code=401, detail=f"Token không hợp lệ: {str(e)}")
 
 
+def extract_email_from_token(authorization: str = Header(None)) -> str:
+    """
+    Trích xuất email từ JWT token Authorization header.
+    Cần dùng vì Cognito User Pool này dùng EMAIL làm Username (không phải sub),
+    nên các thao tác admin_* với Cognito phải định danh user bằng email, không phải user_id.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token không hợp lệ")
+
+    try:
+        import json
+        import base64
+
+        token = authorization.replace("Bearer ", "").strip()
+        parts = token.split(".")
+
+        if len(parts) != 3:
+            raise ValueError("Token format không hợp lệ")
+
+        payload = parts[1]
+        padding = 4 - len(payload) % 4
+        if padding != 4:
+            payload += "=" * padding
+
+        decoded = base64.urlsafe_b64decode(payload)
+        claims = json.loads(decoded)
+
+        email = claims.get("email")
+        if not email:
+            raise ValueError("Token không chứa 'email' claim")
+
+        return email
+
+    except Exception as e:
+        logger.error(f"[Token] Lỗi decode email: {e}")
+        raise HTTPException(status_code=401, detail=f"Token không hợp lệ: {str(e)}")
+
+
+
+def require_user_id(authorization: str = Header(None)) -> str:
+    """
+    Bắt buộc phải có JWT token hợp lệ (raise 401 nếu thiếu/sai).
+    Dùng cho các endpoint tài liệu/chat để đảm bảo per-user isolation tuyệt đối,
+    tránh rơi vào nhánh "global" dùng chung khi token thiếu/lỗi.
+    """
+    return extract_user_id_from_token(authorization)
+
+
 # ─── Request Schemas ───────────────────────────────────────────────────────
 
 class PersonalInfoRequest(BaseModel):
@@ -1232,13 +1149,10 @@ class ChangePasswordRequest(BaseModel):
 
 @app.get("/api/profile")
 def get_profile(authorization: str = Header(None)):
-    """GET /api/profile — Lấy hồ sơ người dùng"""
+    """GET /api/profile — Lấy hồ sơ người dùng (tự tạo lại nếu chưa có - self-healing)"""
     try:
         user_id = extract_user_id_from_token(authorization)
-        user_profile = profile_service.get_user_profile(user_id)
-        
-        if not user_profile:
-            raise HTTPException(status_code=404, detail="Hồ sơ người dùng không tìm thấy")
+        user_profile = profile_service.ensure_user_profile(user_id)
         
         return user_profile
         
@@ -1257,8 +1171,10 @@ def update_personal_info(
     """PUT /api/profile/personal-info — Cập nhật info (name, email, phone, dob)"""
     try:
         user_id = extract_user_id_from_token(authorization)
+        current_username = extract_email_from_token(authorization)
         result = profile_service.update_personal_info(
             user_id=user_id,
+            current_username=current_username,
             fullname=data.fullname,
             email=data.email,
             phone=data.phone,
@@ -1339,45 +1255,27 @@ def change_password(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# EMAIL VERIFICATION CLEANUP ENDPOINT
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.post("/api/admin/cleanup-unverified-users")
-async def cleanup_unverified_users_endpoint(authorization: str = Header(None)):
-    """
-    [ADMIN ONLY] Xóa tài khoản chưa xác thực email sau 5 phút
-    
-    Sync pattern: Cognito → DynamoDB → S3
-    
-    Returns:
-        {
-            "success": true,
-            "cleaned": 5,           # số user bị xóa
-            "failed": 0,            # số lỗi
-            "details": [...]
-        }
-    """
-    try:
-        # TODO: Add admin auth check (e.g., check admin role in JWT)
-        # For now, log that this was called
-        logger.info("[Admin] cleanup-unverified-users called")
-        
-        from modules.profile_service import cleanup_unverified_users
-        result = cleanup_unverified_users()
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"[Admin] Cleanup error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-
 # Phục vụ file tĩnh của frontend React ở root
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
-# Wrapper handler cho AWS Lambda
-handler = Mangum(app)
+# Wrapper handler cho AWS Lambda (dùng cho request HTTP qua API Gateway)
+_mangum_handler = Mangum(app)
+
+
+def handler(event, context):
+    """
+    Lambda entry point. Phân nhánh giữa 2 loại lời gọi:
+    1. HTTP request qua API Gateway (có "requestContext"/"httpMethod") -> chạy FastAPI app qua Mangum
+    2. Scheduled event từ EventBridge (source == "aws.events") -> chạy job cleanup unconfirmed users,
+       KHÔNG chạy qua Mangum/FastAPI vì đây không phải HTTP request
+    """
+    if isinstance(event, dict) and event.get("source") == "aws.events":
+        from modules.auth_service import cleanup_unconfirmed_users
+        logger.info("[EventBridge] Nhận scheduled event, chạy cleanup unconfirmed users...")
+        return cleanup_unconfirmed_users(max_age_minutes=5)
+
+    return _mangum_handler(event, context)
+
 
 if __name__ == "__main__":
     import uvicorn

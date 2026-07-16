@@ -123,8 +123,11 @@ def get_user_profile(user_id: str) -> Optional[Dict[str, Any]]:
 
 def ensure_user_profile(user_id: str) -> Dict[str, Any]:
     """
-    Đảm bảo user profile tồn tại trong DynamoDB.
-    Nếu không tồn tại, tự động tạo profile mới với thông tin mặc định.
+    Đảm bảo user profile tồn tại trong DynamoDB (self-healing fallback).
+    Nếu không tồn tại, lấy thông tin thật từ Cognito (admin_get_user) rồi tạo profile.
+    
+    Dùng cho trường hợp hiếm: user đã confirm ở Cognito nhưng bước tạo profile
+    trong confirm_user_signup() bị lỗi giữa chừng (network drop, v.v.)
     
     Args:
         user_id: Cognito sub
@@ -138,31 +141,57 @@ def ensure_user_profile(user_id: str) -> Dict[str, Any]:
         if existing:
             return existing
         
-        # Create new profile with defaults
-        logger.info(f"[DynamoDB] Tạo profile mới: {user_id}")
+        logger.info(f"[DynamoDB] Profile không tồn tại, tự tạo lại từ Cognito: {user_id}")
+        
+        # Lấy attributes thật từ Cognito. Không dùng admin_get_user(Username=user_id)
+        # vì User Pool này dùng EMAIL làm username, không phải sub -> phải filter theo sub.
+        cognito = get_cognito_client()
+        result = cognito.list_users(
+            UserPoolId=COGNITO_USERPOOL_ID,
+            Filter=f'sub = "{user_id}"'
+        )
+        matched_users = result.get('Users', [])
+        if not matched_users:
+            raise Exception(f"Không tìm thấy user trong Cognito: {user_id}")
+        
+        user = matched_users[0]
+        attrs = {attr['Name']: attr['Value'] for attr in user.get('Attributes', [])}
         
         table = get_dynamodb_resource().Table(USERS_TABLE)
-        now = datetime.utcnow().isoformat() + "Z"
+        timestamp = get_timestamp()
         
         new_profile = {
             "user_id": user_id,
-            "email": "",
-            "fullname": "",
-            "phone": "",
-            "dob": "",
+            "email": attrs.get('email', ''),
+            "fullname": attrs.get('name', ''),
+            "phone": attrs.get('phone_number', ''),
+            "dob": attrs.get('birthdate', ''),
+            "avatar": None,
             "avatar_url": None,
-            "created_at": now,
-            "updated_at": now,
+            "created_at": timestamp,
+            "updated_at": timestamp,
+            "subscription_plan": "free",
+            "document_quota": 50,
+            "documents_used": 0,
+            "storage_quota_gb": 1,
+            "user_preferences": {
+                "language": "vi",
+                "theme": "light",
+                "notifications_enabled": True,
+                "timezone": "Asia/Ho_Chi_Minh",
+            },
         }
         
-        table.put_item(Item=new_profile)
-        logger.info(f"[DynamoDB] Profile được tạo: {user_id}")
+        table.put_item(Item=new_profile, ConditionExpression='attribute_not_exists(user_id)')
+        logger.info(f"[DynamoDB] ✅ Profile tự hồi phục: {user_id}")
         return new_profile
         
     except ClientError as e:
+        if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+            # Race condition: profile vừa được tạo bởi request khác, lấy lại
+            return get_user_profile(user_id)
         logger.error(f"[DynamoDB] Lỗi tạo profile {user_id}: {e}")
         raise Exception(f"Không thể tạo profile: {e}")
-        raise Exception(f"Không thể lấy profile: {e.response['Error']['Message']}")
 
 
 def create_or_update_profile(user_id: str, email: str, **kwargs) -> Dict[str, Any]:
@@ -243,6 +272,7 @@ def create_or_update_profile(user_id: str, email: str, **kwargs) -> Dict[str, An
 
 def update_personal_info(
     user_id: str,
+    current_username: str,
     fullname: str,
     email: str,
     phone: str,
@@ -253,9 +283,12 @@ def update_personal_info(
     SYNC PATTERN: Cognito first (source of truth) → DynamoDB second (cache)
     
     Args:
-        user_id: Cognito sub
+        user_id: Cognito sub (dùng làm key DynamoDB)
+        current_username: Username hiện tại trong Cognito (= email hiện tại,
+            vì User Pool này dùng EMAIL làm Username chứ không phải sub) -
+            dùng để định danh user với Cognito, KHÔNG phải giá trị email mới muốn set
         fullname: Họ tên
-        email: Email
+        email: Email (giá trị MỚI muốn cập nhật)
         phone: Số điện thoại
         dob: Ngày sinh (YYYY-MM-DD)
     
@@ -298,7 +331,7 @@ def update_personal_info(
             cognito = get_cognito_client()
             cognito.admin_update_user_attributes(
                 UserPoolId=COGNITO_USERPOOL_ID,
-                Username=user_id,
+                Username=current_username or user_id,
                 UserAttributes=[
                     {"Name": "name", "Value": fullname},
                     {"Name": "email", "Value": email},
@@ -508,177 +541,3 @@ def change_password(
     except Exception as e:
         logger.error(f"[Profile] Lỗi change password {user_id}: {e}")
         raise
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# EMAIL VERIFICATION TIMEOUT - Auto-cleanup unverified users
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def cleanup_unverified_users() -> Dict[str, Any]:
-    """
-    BACKGROUND JOB: Xóa tài khoản chưa xác thực email sau khi timeout 5 phút
-    
-    Logic:
-    1. Scan DynamoDB cho users với: verification_pending_until < now AND email_verified = false
-    2. Xóa từ Cognito FIRST (nếu không có user, skip)
-    3. Xóa từ DynamoDB
-    4. Xóa S3 data (nếu có)
-    
-    Returns:
-        dict: {
-            "cleaned": int,     # số user bị xóa
-            "failed": int,      # số lỗi
-            "details": [...]    # chi tiết từng user
-        }
-    
-    Note: Được gọi bởi:
-    - Lambda trigger mỗi 1 phút (CloudWatch Events)
-    - Hoặc background task trong FastAPI
-    - Hoặc manual admin endpoint
-    """
-    
-    try:
-        logger.info("[Cleanup] Bắt đầu cleanup unverified users")
-        
-        now = datetime.utcnow()
-        cleaned_count = 0
-        failed_count = 0
-        details = []
-        
-        # ─────────────────────────────────────────────────────────────────
-        # SCAN DynamoDB: Tìm users hết timeout
-        # ─────────────────────────────────────────────────────────────────
-        table = get_dynamodb_resource().Table(USERS_TABLE)
-        
-        # Query pattern: email_verified = false AND verification_pending_until < now
-        # Note: Cần có GSI trên (email_verified, verification_pending_until) để efficient
-        # Fallback: Scan all + filter in code
-        response = table.scan(
-            FilterExpression="email_verified = :false AND attribute_exists(verification_pending_until) AND verification_pending_until < :now",
-            ExpressionAttributeValues={
-                ":false": False,
-                ":now": now.isoformat() + 'Z',  # ISO format
-            }
-        )
-        
-        unverified_users = response.get('Items', [])
-        logger.info(f"[Cleanup] Tìm thấy {len(unverified_users)} users chưa xác thực hết timeout")
-        
-        cognito = get_cognito_client()
-        
-        # ─────────────────────────────────────────────────────────────────
-        # Xóa từng user: Cognito FIRST → DynamoDB → S3
-        # ─────────────────────────────────────────────────────────────────
-        for user_data in unverified_users:
-            user_id = user_data.get('user_id')
-            email = user_data.get('email')
-            timeout_at = user_data.get('verification_pending_until')
-            
-            try:
-                # STEP 1: Xóa từ Cognito (Source of Truth)
-                try:
-                    cognito.admin_delete_user(
-                        UserPoolId=COGNITO_USERPOOL_ID,
-                        Username=email
-                    )
-                    logger.info(f"[Cognito] ✅ Deleted unverified user: {user_id} ({email})")
-                except ClientError as e:
-                    error_code = e.response['Error']['Code']
-                    if error_code == 'UserNotFoundException':
-                        logger.warning(f"[Cognito] ⚠️ User not found: {email} (may have been deleted)")
-                    else:
-                        raise e
-                
-                # STEP 2: Xóa từ DynamoDB
-                table.delete_item(Key={'user_id': user_id})
-                logger.info(f"[DynamoDB] ✅ Deleted profile: {user_id}")
-                
-                # STEP 3: Xóa S3 data (chat history, documents, uploads)
-                try:
-                    import boto3
-                    s3 = boto3.client('s3', region_name=config.AWS_DEFAULT_REGION)
-                    
-                    # Delete all user data from S3
-                    # - s3://smartdocai-storage.../chat_history/{user_id}.json
-                    # - s3://smartdocai-storage.../processed_files/{user_id}.json
-                    # - s3://smartdocai-storage.../avatars/{user_id}/...
-                    # - s3://smartdocai-storage.../uploads/{user_id}/...
-                    
-                    keys_to_delete = [
-                        f'chat_history/{user_id}.json',
-                        f'processed_files/{user_id}.json',
-                    ]
-                    
-                    for key in keys_to_delete:
-                        try:
-                            s3.delete_object(Bucket=config.S3_BUCKET, Key=key)
-                            logger.info(f"[S3] ✅ Deleted: {key}")
-                        except Exception as e:
-                            logger.warning(f"[S3] ⚠️ Failed to delete {key}: {e}")
-                    
-                    # List and delete all user directory contents (avatars, uploads, etc)
-                    try:
-                        paginator = s3.get_paginator('list_objects_v2')
-                        for prefix in [f'avatars/{user_id}/', f'uploads/{user_id}/']:
-                            for page in paginator.paginate(Bucket=config.S3_BUCKET, Prefix=prefix):
-                                if 'Contents' in page:
-                                    for obj in page['Contents']:
-                                        s3.delete_object(Bucket=config.S3_BUCKET, Key=obj['Key'])
-                                        logger.info(f"[S3] ✅ Deleted: {obj['Key']}")
-                    except Exception as e:
-                        logger.warning(f"[S3] ⚠️ Failed to delete user directories: {e}")
-                
-                except Exception as e:
-                    logger.warning(f"[S3] ⚠️ S3 cleanup error for {user_id}: {e}")
-                
-                cleaned_count += 1
-                details.append({
-                    "user_id": user_id,
-                    "email": email,
-                    "timeout_at": timeout_at,
-                    "status": "deleted",
-                })
-                
-            except Exception as e:
-                failed_count += 1
-                logger.error(f"[Cleanup] ❌ Failed to delete user {user_id}: {e}")
-                details.append({
-                    "user_id": user_id,
-                    "email": email,
-                    "status": "failed",
-                    "error": str(e),
-                })
-        
-        result = {
-            "success": True,
-            "cleaned": cleaned_count,
-            "failed": failed_count,
-            "total": len(unverified_users),
-            "timestamp": now.isoformat(),
-            "details": details,
-        }
-        
-        logger.info(f"[Cleanup] ✅ Hoàn thành: cleaned={cleaned_count}, failed={failed_count}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"[Cleanup] ❌ Fatal error: {e}")
-        raise
-
-
-def schedule_cleanup_unverified_users():
-    """
-    Helper: Schedule cleanup job (được gọi bởi FastAPI startup)
-    Có thể dùng APScheduler hoặc background tasks
-    
-    Usage:
-        # In FastAPI startup
-        from apscheduler.schedulers.background import BackgroundScheduler
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(schedule_cleanup_unverified_users, 'interval', minutes=1)
-        scheduler.start()
-    """
-    try:
-        cleanup_unverified_users()
-    except Exception as e:
-        logger.error(f"[Cleanup] Scheduled task error: {e}")

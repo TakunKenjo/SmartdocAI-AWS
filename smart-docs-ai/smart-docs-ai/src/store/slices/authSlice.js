@@ -1,7 +1,8 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { CognitoUser, AuthenticationDetails, CognitoUserAttribute } from "amazon-cognito-identity-js";
+import { CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
 import { userPool } from "@/api/cognito.js";
 import { profileService } from "@/api/services/profileService.js";
+import axiosClient from "@/api/axiosConfig.js";
 
 // ─── Đăng nhập Cognito ──────────────────────────────────────────────────────────
 export const login = createAsyncThunk(
@@ -16,6 +17,7 @@ export const login = createAsyncThunk(
       const userData = {
         Username: email,
         Pool: userPool,
+        Storage: userPool.storage,
       };
       const cognitoUser = new CognitoUser(userData);
       
@@ -38,56 +40,42 @@ export const login = createAsyncThunk(
   }
 );
 
-// ─── Đăng ký Cognito ────────────────────────────────────────────────────────────
+// ─── Đăng ký (qua Backend API, để đồng bộ DynamoDB) ─────────────────────────────
 export const register = createAsyncThunk(
   "auth/register",
   async ({ email, password, fullname, phone, dob }, { rejectWithValue }) => {
-    return new Promise((resolve, reject) => {
-      const attributeList = [];
-      
-      // Định dạng SĐT sang chuẩn E.164 của Cognito (ví dụ: +84...)
-      let formattedPhone = phone.trim().replace(/\s/g, "");
-      if (formattedPhone.startsWith("0")) {
-        formattedPhone = "+84" + formattedPhone.substring(1);
-      } else if (!formattedPhone.startsWith("+")) {
-        formattedPhone = "+84" + formattedPhone;
-      }
-      
-      attributeList.push(new CognitoUserAttribute({ Name: "email", Value: email }));
-      attributeList.push(new CognitoUserAttribute({ Name: "name", Value: fullname }));
-      attributeList.push(new CognitoUserAttribute({ Name: "phone_number", Value: formattedPhone }));
-      attributeList.push(new CognitoUserAttribute({ Name: "birthdate", Value: dob }));
-      
-      userPool.signUp(email, password, attributeList, null, (err, result) => {
-        if (err) {
-          reject(rejectWithValue(err.message || "Đăng ký thất bại."));
-        } else {
-          resolve({ success: true, email });
-        }
+    try {
+      const res = await axiosClient.post("/api/auth/register", {
+        email,
+        password,
+        fullname,
+        phone,
+        dob,
       });
-    });
+      return { success: true, email: res.data.email ?? email };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.detail || err.message || "Đăng ký thất bại."
+      );
+    }
   }
 );
 
-// ─── Xác thực Code Đăng ký Cognito ─────────────────────────────────────────────────
+// ─── Xác thực Code Đăng ký (qua Backend API, để đồng bộ DynamoDB) ──────────────
 export const confirmCode = createAsyncThunk(
   "auth/confirmCode",
   async ({ email, code }, { rejectWithValue }) => {
-    return new Promise((resolve, reject) => {
-      const userData = {
-        Username: email,
-        Pool: userPool,
-      };
-      const cognitoUser = new CognitoUser(userData);
-      
-      cognitoUser.confirmRegistration(code, true, (err, result) => {
-        if (err) {
-          reject(rejectWithValue(err.message || "Mã xác thực không chính xác hoặc đã hết hạn."));
-        } else {
-          resolve(result);
-        }
+    try {
+      const res = await axiosClient.post("/api/auth/confirm-signup", {
+        email,
+        confirmation_code: code,
       });
-    });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.detail || err.message || "Mã xác thực không chính xác hoặc đã hết hạn."
+      );
+    }
   }
 );
 

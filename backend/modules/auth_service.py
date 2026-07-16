@@ -7,7 +7,7 @@ Tích hợp Cognito + DynamoDB
 import boto3
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from botocore.exceptions import ClientError
 from config import AWS_DEFAULT_REGION, COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID, DYNAMODB_USERS_TABLE
 from .profile_service import (
@@ -179,53 +179,10 @@ def register_user(email, password, fullname, phone, dob):
         user_id = response['UserSub']
         logger.info(f"[Register] ✅ Cognito user created: user_id={user_id}")
         
-        # ───────────────────────────────────────────────────────────────────
-        # [3/3] Tạo profile trong DynamoDB
-        # ───────────────────────────────────────────────────────────────────
-        logger.info(f"[Register] [DEBUG] Getting DynamoDB resource...")
-        dynamodb = get_dynamodb_resource()
-        logger.info(f"[Register] [DEBUG] DynamoDB resource OK")
-        
-        logger.info(f"[Register] [DEBUG] Getting table: {DYNAMODB_USERS_TABLE}")
-        table = dynamodb.Table(DYNAMODB_USERS_TABLE)
-        logger.info(f"[Register] [DEBUG] Table object created")
-        
-        timestamp = get_timestamp()
-        # Calculate verification timeout: 5 minutes from now
-        verification_pending_until = (datetime.utcnow() + timedelta(minutes=5)).replace(microsecond=0).isoformat() + 'Z'
-        
-        logger.info(f"[Register] [DEBUG] Calling table.put_item() with user_id={user_id}")
-        table.put_item(
-            Item={
-                'user_id': user_id,
-                'email': email,
-                'fullname': fullname,
-                'phone': formatted_phone,
-                'dob': dob,
-                'avatar': None,
-                'avatar_url': None,
-                'created_at': timestamp,
-                'updated_at': timestamp,
-                # ─────────── EMAIL VERIFICATION (NEW) ─────────────────
-                'email_verified': False,  # Mirrors Cognito (not verified yet)
-                'verification_pending_until': verification_pending_until,  # Auto-cleanup after 5 min
-                'verification_attempts': 0,  # Track resend attempts
-                # ─────────── SUBSCRIPTION & QUOTA (NEW) ───────────────
-                'subscription_plan': 'free',
-                'document_quota': 50,  # Free tier: 50 documents
-                'documents_used': 0,
-                'storage_quota_gb': 1,  # 1GB free
-                # ─────────── PREFERENCES (NEW) ────────────────────────
-                'user_preferences': {
-                    'language': 'vi',
-                    'theme': 'light',
-                    'notifications_enabled': True,
-                    'timezone': 'Asia/Ho_Chi_Minh',
-                },
-            }
-        )
-        logger.info(f"[Register] ✅ DynamoDB profile created: user_id={user_id}")
-        logger.info(f"[Register] Verification timeout set to {verification_pending_until}")
+        # LƯU Ý: KHÔNG tạo DynamoDB profile ở đây.
+        # Profile chỉ được tạo sau khi user xác thực email thành công (xem confirm_user_signup()).
+        # Lý do: user chưa verify thì cũng không login được (Cognito chặn UNCONFIRMED),
+        # nên tạo profile sớm chỉ sinh ra rác + cần thêm scheduler dọn dẹp không cần thiết.
         
         return {
             "success": True,
@@ -305,38 +262,57 @@ def confirm_user_signup(email, confirmation_code):
                 raise Exception(f"Lỗi xác thực: {error_msg}")
         
         # ─────────────────────────────────────────────────────────────────
-        # STEP 2: Update DYNAMODB (Cache) - Mirror verification status
+        # STEP 2: Tạo DYNAMODB PROFILE (chỉ tạo ở đây, sau khi verify thành công)
         # ─────────────────────────────────────────────────────────────────
         try:
-            # Get user from Cognito to find user_id
+            # Lấy đầy đủ attributes từ Cognito để tạo profile
             user = cognito.admin_get_user(
                 UserPoolId=COGNITO_USER_POOL_ID,
                 Username=email
             )
-            user_id = user['Username']  # or from user attributes
             
-            # Find user_id from sub attribute
-            for attr in user.get('UserAttributes', []):
-                if attr['Name'] == 'sub':
-                    user_id = attr['Value']
-                    break
+            attrs = {attr['Name']: attr['Value'] for attr in user.get('UserAttributes', [])}
+            user_id = attrs.get('sub', user['Username'])
             
-            # Update DynamoDB to mirror email_verified and clear timeout
             dynamodb = get_dynamodb_resource()
             table = dynamodb.Table(DYNAMODB_USERS_TABLE)
-            table.update_item(
-                Key={'user_id': user_id},
-                UpdateExpression='SET email_verified = :verified, verification_pending_until = :null, updated_at = :now',
-                ExpressionAttributeValues={
-                    ':verified': True,
-                    ':null': None,  # Clear timeout
-                    ':now': get_timestamp(),
-                }
+            timestamp = get_timestamp()
+            
+            # put_item với ConditionExpression: chỉ tạo nếu chưa tồn tại (idempotent,
+            # tránh trường hợp confirm được gọi lại/duplicate ghi đè profile đã có)
+            table.put_item(
+                Item={
+                    'user_id': user_id,
+                    'email': attrs.get('email', email),
+                    'fullname': attrs.get('name', ''),
+                    'phone': attrs.get('phone_number', ''),
+                    'dob': attrs.get('birthdate', ''),
+                    'avatar': None,
+                    'avatar_url': None,
+                    'created_at': timestamp,
+                    'updated_at': timestamp,
+                    'subscription_plan': 'free',
+                    'document_quota': 50,
+                    'documents_used': 0,
+                    'storage_quota_gb': 1,
+                    'user_preferences': {
+                        'language': 'vi',
+                        'theme': 'light',
+                        'notifications_enabled': True,
+                        'timezone': 'Asia/Ho_Chi_Minh',
+                    },
+                },
+                ConditionExpression='attribute_not_exists(user_id)'
             )
-            logger.info(f"[DynamoDB] ✅ Updated email_verified for {user_id}")
+            logger.info(f"[DynamoDB] ✅ Profile created: user_id={user_id}")
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                logger.info(f"[DynamoDB] Profile đã tồn tại, bỏ qua: user_id={user_id}")
+            else:
+                # Log warning but don't fail - Cognito đã confirm rồi, /api/profile sẽ tự tạo lại (self-healing)
+                logger.warning(f"[DynamoDB] ⚠️ Không tạo được profile: {e}")
         except Exception as e:
-            # Log warning but don't fail - Cognito already confirmed
-            logger.warning(f"[DynamoDB] ⚠️ Failed to update verification status: {e}")
+            logger.warning(f"[DynamoDB] ⚠️ Không tạo được profile: {e}")
         
         return {
             "success": True,
@@ -346,3 +322,61 @@ def confirm_user_signup(email, confirmation_code):
     except Exception as e:
         logger.error(f"[ConfirmSignUp] ❌ Error: {str(e)}")
         raise
+
+
+# ─── Cleanup unconfirmed users (gọi định kỳ bởi EventBridge Scheduled Rule) ────
+
+def cleanup_unconfirmed_users(max_age_minutes: int = 5) -> dict:
+    """
+    Xóa các user Cognito ở trạng thái UNCONFIRMED đã tồn tại quá `max_age_minutes` phút.
+    Không đụng gì tới DynamoDB vì user UNCONFIRMED không có profile ở đó (theo thiết kế
+    hiện tại: profile chỉ tạo sau khi confirm-signup thành công).
+
+    Được gọi bởi EventBridge Scheduled Rule (không phải qua HTTP), xem app_api.handler().
+    """
+    from datetime import timezone, timedelta
+
+    cognito = get_cognito_client()
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(minutes=max_age_minutes)
+
+    deleted = []
+    failed = []
+
+    try:
+        paginator = cognito.get_paginator('list_users')
+        pages = paginator.paginate(
+            UserPoolId=COGNITO_USER_POOL_ID,
+            Filter='cognito:user_status = "UNCONFIRMED"'
+        )
+
+        for page in pages:
+            for user in page.get('Users', []):
+                username = user['Username']
+                created_at = user['UserCreateDate']
+
+                if created_at < cutoff:
+                    try:
+                        cognito.admin_delete_user(
+                            UserPoolId=COGNITO_USER_POOL_ID,
+                            Username=username
+                        )
+                        deleted.append(username)
+                        logger.info(f"[Cleanup] ✅ Đã xóa user UNCONFIRMED quá hạn: {username} (tạo lúc {created_at})")
+                    except ClientError as e:
+                        failed.append({"username": username, "error": str(e)})
+                        logger.error(f"[Cleanup] ❌ Không xóa được {username}: {e}")
+
+    except ClientError as e:
+        logger.error(f"[Cleanup] ❌ Lỗi khi list users: {e}")
+        raise
+
+    result = {
+        "success": True,
+        "deleted_count": len(deleted),
+        "deleted": deleted,
+        "failed_count": len(failed),
+        "failed": failed,
+    }
+    logger.info(f"[Cleanup] Hoàn thành: xóa {len(deleted)} user, lỗi {len(failed)} user")
+    return result

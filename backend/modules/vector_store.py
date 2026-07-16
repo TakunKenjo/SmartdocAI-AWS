@@ -63,6 +63,16 @@ def create_vector_store(documents: List[Document]) -> Optional[Any]:
         from langchain_community.vectorstores import FAISS
         embeddings = get_embedding_model()
         logger.info(f"Đang tạo vector store từ {len(documents)} chunks...")
+
+        # QUAN TRỌNG: reset .id về None cho MỌI document trước khi build.
+        # FAISS.from_documents() lấy ids = [doc.id for doc in documents]; nếu CHỈ MỘT
+        # document có sẵn .id (ví dụ document cũ lấy lại từ docstore) thì nó sẽ ép toàn bộ
+        # list dùng ids đó - kể cả các document mới có .id=None - dẫn tới nhiều None trùng
+        # nhau trong danh sách ids -> FAISS raise "Duplicate ids found in the ids list."
+        # Reset hết về None để FAISS tự sinh UUID mới, duy nhất cho mọi document.
+        for doc in documents:
+            doc.id = None
+
         vector_store = FAISS.from_documents(documents, embeddings)
         logger.info("Đã tạo vector store thành công!")
         return vector_store
@@ -219,25 +229,43 @@ def clear_vector_store(index_name: Optional[str] = None) -> bool:
         logger.error(f"Lỗi khi xóa vector store: {str(e)}")
         return False
 
-_bm25_retriever_cache = None
 
-def create_bm25_retriever(documents: List[Document], top_k: Optional[int] = None):
+def get_documents_from_vector_store(vector_store: Any) -> List[Document]:
+    """
+    Lấy lại toàn bộ Document gốc đã lưu trong FAISS docstore.
+    Dùng thay cho việc giữ riêng 1 list 'raw_documents' trong bộ nhớ:
+    FAISS đã tự lưu/tải lại các Document gốc mỗi khi save_local()/load_local(),
+    nên chỉ cần đọc lại từ chính vector_store của đúng user là đủ, tránh lẫn dữ liệu giữa các user.
+    """
+    if vector_store is None:
+        return []
+    try:
+        return list(vector_store.docstore._dict.values())
+    except Exception as e:
+        logger.error(f"Lỗi khi lấy documents từ vector store: {str(e)}")
+        return []
+
+
+# Cache BM25 retriever theo từng user (key = user_id) để tránh lẫn dữ liệu giữa các user
+_bm25_retriever_cache: dict = {}
+
+def create_bm25_retriever(documents: List[Document], top_k: Optional[int] = None, user_id: Optional[str] = None):
     global _bm25_retriever_cache
     try:
         from langchain_community.retrievers import BM25Retriever
         _k = top_k or config.HYBRID_TOP_K
         retriever = BM25Retriever.from_documents(documents)
         retriever.k = _k
-        _bm25_retriever_cache = retriever
-        logger.info(f"Đã tạo BM25 retriever với {len(documents)} documents, k={_k}")
+        _bm25_retriever_cache[user_id] = retriever
+        logger.info(f"Đã tạo BM25 retriever với {len(documents)} documents, k={_k}, user_id={user_id}")
         return retriever
     except Exception as e:
         logger.error(f"Lỗi khi tạo BM25 retriever: {str(e)}")
         return None
 
 
-def get_cached_bm25_retriever():
-    return _bm25_retriever_cache
+def get_cached_bm25_retriever(user_id: Optional[str] = None):
+    return _bm25_retriever_cache.get(user_id)
 
 
 def create_ensemble_retriever(vector_store: Any, bm25_retriever):
