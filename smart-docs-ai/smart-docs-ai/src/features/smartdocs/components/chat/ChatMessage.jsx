@@ -1,8 +1,14 @@
 import { cn } from "@/lib/utils";
-import { User, BrainCircuit } from "lucide-react";
+import { BrainCircuit } from "lucide-react";
+import { useSelector } from "react-redux";
+import { selectAuthUser } from "@/store/slices/authSlice.js";
 import SourceCitationPanel from "./SourceCitationPanel.jsx";
 import SelfRagMetadata from "./SelfRagMetadata.jsx";
 import CoRagMetadata from "./CoRagMetadata.jsx";
+
+// Helper: lấy 2 chữ cái đầu tên
+const getInitials = (fullname = "") =>
+  fullname.trim().split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U";
 
 /**
  * ChatMessage — Bubble cho một tin nhắn (user hoặc assistant)
@@ -11,6 +17,7 @@ import CoRagMetadata from "./CoRagMetadata.jsx";
 function ChatMessage({ message }) {
   const { role, content, sources, searchMode, selfRagMeta, coRagMeta, questionCtx } = message;
   const isUser = role === "user";
+  const authUser = useSelector(selectAuthUser);
 
   // Badge mode
   const modeBadges = [];
@@ -73,8 +80,18 @@ function ChatMessage({ message }) {
 
       {/* Avatar for user */}
       {isUser && (
-        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center flex-shrink-0 mt-1">
-          <User className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+        <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mt-1 ring-2 ring-white dark:ring-slate-800 shadow-sm">
+          {authUser?.avatar ? (
+            <img
+              src={authUser.avatar}
+              alt="Avatar"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center text-[10px] font-bold text-white">
+              {getInitials(authUser?.fullname)}
+            </div>
+          )}
         </div>
       )}
     </div>
