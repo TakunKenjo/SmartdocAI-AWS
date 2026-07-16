@@ -1256,6 +1256,11 @@ def change_password(
 
 
 # Phục vụ file tĩnh của frontend React ở root
+# Đảm bảo thư mục tồn tại trước khi mount: "static/libs" bị .gitignore nên khi
+# CodePipeline clone code sạch từ GitHub để build Docker image, thư mục "static"
+# có thể không tồn tại -> StaticFiles sẽ raise RuntimeError ngay lúc import module
+# và làm sập Lambda init. Tạo thư mục rỗng nếu thiếu để tránh crash.
+os.makedirs("static", exist_ok=True)
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 # Wrapper handler cho AWS Lambda (dùng cho request HTTP qua API Gateway)
