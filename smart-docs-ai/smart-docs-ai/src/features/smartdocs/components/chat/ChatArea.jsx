@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { BrainCircuit, ChevronDown, Loader2 } from "lucide-react";
+import { BrainCircuit, ChevronDown, Loader2, Menu } from "lucide-react";
 import {
   selectChatHistory,
   selectIsChatLoading,
@@ -14,8 +14,9 @@ import ChatInput from "./ChatInput.jsx";
 /**
  * ChatArea — Vùng chat chính: messages list + settings expander + input bar
  * Bao gồm auto-scroll xuống cuối, loading indicator, scroll-to-bottom button
+ * Nhận prop onOpenSidebar — gọi khi nhấn hamburger menu trên mobile
  */
-function ChatArea() {
+function ChatArea({ onOpenSidebar = () => {} }) {
   const chatHistory = useSelector(selectChatHistory);
   const isLoading = useSelector(selectIsChatLoading);
   const processedFiles = useSelector(selectProcessedFiles);
@@ -48,6 +49,34 @@ function ChatArea() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-slate-950">
+
+      {/* ── Mobile top bar — chỉ hiện trên mobile (< md) — ẩn trên desktop —— */}
+      <div className="flex md:hidden flex-shrink-0 items-center justify-between px-3 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          {/* Hamburger button */}
+          <button
+            onClick={onOpenSidebar}
+            className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Mở menu"
+            id="mobile-menu-btn"
+          >
+            <Menu className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+          </button>
+
+          {/* Brand */}
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-600/30">
+              <BrainCircuit className="h-4 w-4 text-white" />
+            </div>
+            <span className="font-bold text-sm text-slate-900 dark:text-slate-50 leading-none">SmartDocAI</span>
+          </div>
+        </div>
+
+        {/* Right side placeholder — có thể thêm nút sau */}
+        <div className="w-9" aria-hidden="true" />
+      </div>
+      {/* ────────────────────────────────────────────── */}
+
       {/* ── Messages Area ── */}
       <div
         ref={scrollContainerRef}

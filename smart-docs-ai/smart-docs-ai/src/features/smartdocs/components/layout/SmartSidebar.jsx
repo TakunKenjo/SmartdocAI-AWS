@@ -1,7 +1,7 @@
 import { useEffect, useContext, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router";
-import { BrainCircuit, RefreshCw, Sun, Moon, PanelLeftClose, PanelLeftOpen, LogOut } from "lucide-react";
+import { BrainCircuit, RefreshCw, Sun, Moon, PanelLeftClose, PanelLeftOpen, LogOut, X, UserCircle } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
 import { ThemeContext } from "@/contexts/ThemeContext.jsx";
@@ -28,7 +28,7 @@ import ChatHistoryList from "../sidebar/ChatHistoryList.jsx";
  * SmartSidebar — Sidebar riêng của SmartdocAI
  * Layout từ trên xuống: Brand → Status → KPI → Chunk Settings → Upload → File List → Actions → History
  */
-function SmartSidebar() {
+function SmartSidebar({ mobileOpen = false, onMobileClose = () => {} }) {
   const [collapsed, setCollapsed] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -57,9 +57,16 @@ function SmartSidebar() {
 
   return (
   <aside
-    className={`${
-      collapsed ? "w-20" : "w-72"
-    } flex-shrink-0 h-full bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-all duration-300`}
+    className={[
+      "fixed inset-y-0 left-0 z-50",
+      mobileOpen ? "translate-x-0" : "-translate-x-full",
+      "md:relative md:inset-auto md:z-auto md:translate-x-0",
+      "w-72",
+      collapsed ? "md:w-20" : "md:w-72",
+      "flex-shrink-0 h-full bg-slate-50 dark:bg-slate-950",
+      "border-r border-slate-200 dark:border-slate-800",
+      "flex flex-col overflow-hidden transition-all duration-300",
+    ].join(" ")}
   >      
       <div
         className={`flex-1 overflow-y-auto py-5 transition-all ${
@@ -97,6 +104,16 @@ function SmartSidebar() {
               collapsed ? "flex-col gap-2 mt-2" : "items-center gap-1"
             }`}
           >
+            {/* Mobile close button — chỉ hiện trên mobile */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="md:hidden h-8 w-8 mr-1"
+              onClick={onMobileClose}
+              aria-label="Đóng menu"
+            >
+              <X className="h-4 w-4" />
+            </Button>
             <Button
               size="icon"
               variant="ghost"
@@ -172,30 +189,59 @@ function SmartSidebar() {
         {!collapsed && (<ChatHistoryList />)}
       </div>
 
-      {/* ── Logout footer ── */}
+      {/* ── Logout + Profile footer ── */}
       <div className={`flex-shrink-0 border-t border-slate-200 dark:border-slate-800 ${
         collapsed ? "p-2" : "p-3"
       }`}>
         {collapsed ? (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-9 w-9 mx-auto flex text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-            onClick={handleLogout}
-            title="Đăng xuất"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-col gap-2 items-center">
+            {/* Profile icon — collapsed */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors"
+              onClick={() => { onMobileClose(); navigate("/app/profile"); }}
+              title="Hồ sơ cá nhân"
+            >
+              <UserCircle className="h-4 w-4" />
+            </Button>
+            {/* Logout icon — collapsed */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 mx-auto flex text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+              onClick={handleLogout}
+              title="Đăng xuất"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         ) : (
           <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0">
+            {/* Avatar + tên user */}
+            <button
+              onClick={() => { onMobileClose(); navigate("/app/profile"); }}
+              className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+              title="Xem hồ sơ"
+            >
               <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
                 {authUser?.fullname || authUser?.email?.split("@")[0] || "Người dùng"}
               </p>
               <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
                 {authUser?.email || ""}
               </p>
-            </div>
+            </button>
+            {/* Profile button — expanded */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 flex-shrink-0 text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
+              onClick={() => { onMobileClose(); navigate("/app/profile"); }}
+              title="Hồ sơ cá nhân"
+            >
+              <UserCircle className="h-4 w-4" />
+            </Button>
+            {/* Logout button — expanded */}
             <Button
               size="icon"
               variant="ghost"
