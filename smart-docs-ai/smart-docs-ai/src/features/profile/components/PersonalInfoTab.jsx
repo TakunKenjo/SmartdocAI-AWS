@@ -2,10 +2,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
-import { useSelector } from "react-redux";
-import { selectCurrentUser } from "@/store/slices/authSlice";
-import React, { useState } from "react";
-import { useDispatch } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { selectCurrentUser, getProfile } from "@/store/slices/authSlice";
+import React, { useState, useEffect } from "react";
 import { updatePersonalInfo } from "@/store/slices/authSlice";
 import { toast } from "sonner";
 
@@ -30,13 +29,28 @@ const PersonalInfoTab = () => {
   const dispatch = useDispatch();
   const user = useSelector(selectCurrentUser);
 
-  const [fullname, setFullname] = useState(user?.fullname || "");
-  const [email,    setEmail]    = useState(user?.email    || "");
-  const [phone,    setPhone]    = useState(user?.phone    || "");
-  const [dob,      setDob]      = useState(user?.dob      || "");
+  const [fullname, setFullname] = useState("");
+  const [email,    setEmail]    = useState("");
+  const [phone,    setPhone]    = useState("");
+  const [dob,      setDob]      = useState("");
 
   const [errors,      setErrors]      = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load profile từ DynamoDB khi component mount
+  useEffect(() => {
+    if (user?.id) {
+      dispatch(getProfile());
+    }
+  }, [dispatch, user?.id]);
+
+  // Update form fields khi user thay đổi
+  useEffect(() => {
+    setFullname(user?.fullname || "");
+    setEmail(user?.email || "");
+    setPhone(user?.phone || "");
+    setDob(user?.dob || "");
+  }, [user]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -56,10 +70,9 @@ const PersonalInfoTab = () => {
 
   const handleUpdatePersonalInfo = async () => {
     if (!validateForm()) return;
-    if (!user?.id) { toast.error("Không tìm thấy user!"); return; }
     setIsSubmitting(true);
     try {
-      await dispatch(updatePersonalInfo({ userId: user.id, fullname, email, phone, dob })).unwrap();
+      await dispatch(updatePersonalInfo({ fullname, email, phone, dob })).unwrap();
       toast.success("Cập nhật thành công!");
     } catch (error) {
       toast.error("Lỗi!", { description: error });

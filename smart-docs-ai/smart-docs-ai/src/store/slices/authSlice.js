@@ -1,7 +1,8 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { CognitoUser, AuthenticationDetails, CognitoUserAttribute } from "amazon-cognito-identity-js";
+import { CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
 import { userPool } from "@/api/cognito.js";
 import { profileService } from "@/api/services/profileService.js";
+import axiosClient from "@/api/axiosConfig.js";
 
 // ─── Đăng nhập Cognito ──────────────────────────────────────────────────────────
 export const login = createAsyncThunk(
@@ -16,6 +17,7 @@ export const login = createAsyncThunk(
       const userData = {
         Username: email,
         Pool: userPool,
+        Storage: userPool.storage,
       };
       const cognitoUser = new CognitoUser(userData);
       
@@ -38,56 +40,42 @@ export const login = createAsyncThunk(
   }
 );
 
-// ─── Đăng ký Cognito ────────────────────────────────────────────────────────────
+// ─── Đăng ký (qua Backend API, để đồng bộ DynamoDB) ─────────────────────────────
 export const register = createAsyncThunk(
   "auth/register",
   async ({ email, password, fullname, phone, dob }, { rejectWithValue }) => {
-    return new Promise((resolve, reject) => {
-      const attributeList = [];
-      
-      // Định dạng SĐT sang chuẩn E.164 của Cognito (ví dụ: +84...)
-      let formattedPhone = phone.trim().replace(/\s/g, "");
-      if (formattedPhone.startsWith("0")) {
-        formattedPhone = "+84" + formattedPhone.substring(1);
-      } else if (!formattedPhone.startsWith("+")) {
-        formattedPhone = "+84" + formattedPhone;
-      }
-      
-      attributeList.push(new CognitoUserAttribute({ Name: "email", Value: email }));
-      attributeList.push(new CognitoUserAttribute({ Name: "name", Value: fullname }));
-      attributeList.push(new CognitoUserAttribute({ Name: "phone_number", Value: formattedPhone }));
-      attributeList.push(new CognitoUserAttribute({ Name: "birthdate", Value: dob }));
-      
-      userPool.signUp(email, password, attributeList, null, (err, result) => {
-        if (err) {
-          reject(rejectWithValue(err.message || "Đăng ký thất bại."));
-        } else {
-          resolve({ success: true, email });
-        }
+    try {
+      const res = await axiosClient.post("/api/auth/register", {
+        email,
+        password,
+        fullname,
+        phone,
+        dob,
       });
-    });
+      return { success: true, email: res.data.email ?? email };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.detail || err.message || "Đăng ký thất bại."
+      );
+    }
   }
 );
 
-// ─── Xác thực Code Đăng ký Cognito ─────────────────────────────────────────────────
+// ─── Xác thực Code Đăng ký (qua Backend API, để đồng bộ DynamoDB) ──────────────
 export const confirmCode = createAsyncThunk(
   "auth/confirmCode",
   async ({ email, code }, { rejectWithValue }) => {
-    return new Promise((resolve, reject) => {
-      const userData = {
-        Username: email,
-        Pool: userPool,
-      };
-      const cognitoUser = new CognitoUser(userData);
-      
-      cognitoUser.confirmRegistration(code, true, (err, result) => {
-        if (err) {
-          reject(rejectWithValue(err.message || "Mã xác thực không chính xác hoặc đã hết hạn."));
-        } else {
-          resolve(result);
-        }
+    try {
+      const res = await axiosClient.post("/api/auth/confirm-signup", {
+        email,
+        confirmation_code: code,
       });
-    });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.detail || err.message || "Mã xác thực không chính xác hoặc đã hết hạn."
+      );
+    }
   }
 );
 
@@ -123,77 +111,57 @@ const initialState = {
 // PROFILE — Thunks bổ sung cho feature/profile (chỉ thêm vào, không sửa code trên)
 // ════════════════════════════════════════════════════════════════════════════════
 
-// ─── Cập nhật Avatar ─────────────────────────────────────────────────────────
-export const updateAvatar = createAsyncThunk(
-  "auth/updateAvatar",
-  async ({ userId, avatar }, { rejectWithValue }) => {
+// ─── Lấy thông tin profile từ Backend (DynamoDB) ──────────────────
+export const getProfile = createAsyncThunk(
+  "auth/getProfile",
+  async (_, { rejectWithValue }) => {
     try {
-      await profileService.updateAvatar(userId, avatar);
-      return avatar; // trả về base64 để cập nhật state.user.avatar
+      const res = await profileService.getProfile();
+      return res;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message || "Cập nhật ảnh thất bại.");
+      return rejectWithValue(err.response?.data?.detail || err.message || "Lấy profile thất bại.");
     }
   }
 );
 
-// ─── Cập nhật thông tin cá nhân (Cognito updateAttributes) ────────────────────
-export const updatePersonalInfo = createAsyncThunk(
-  "auth/updatePersonalInfo",
-  async ({ userId, fullname, email, phone, dob }, { rejectWithValue }) => {
-    return new Promise((resolve, reject) => {
-      const cognitoUser = userPool.getCurrentUser();
-      if (!cognitoUser) {
-        return reject(rejectWithValue("Không tìm thấy session. Vui lòng đăng nhập lại."));
-      }
-      cognitoUser.getSession((err, session) => {
-        if (err || !session) {
-          return reject(rejectWithValue("Session hết hạn. Vui lòng đăng nhập lại."));
-        }
-        // Định dạng SĐT sang chuẩn E.164
-        let formattedPhone = (phone || "").trim().replace(/\s/g, "");
-        if (formattedPhone.startsWith("0")) {
-          formattedPhone = "+84" + formattedPhone.substring(1);
-        } else if (formattedPhone && !formattedPhone.startsWith("+")) {
-          formattedPhone = "+84" + formattedPhone;
-        }
-        const attributeList = [
-          new CognitoUserAttribute({ Name: "name",  Value: fullname }),
-          new CognitoUserAttribute({ Name: "email", Value: email }),
-        ];
-        if (formattedPhone) {
-          attributeList.push(new CognitoUserAttribute({ Name: "phone_number", Value: formattedPhone }));
-        }
-        if (dob) {
-          attributeList.push(new CognitoUserAttribute({ Name: "birthdate", Value: dob }));
-        }
-        cognitoUser.updateAttributes(attributeList, (updateErr) => {
-          if (updateErr) reject(rejectWithValue(updateErr.message || "Cập nhật thất bại."));
-          else resolve({ fullname, email, phone, dob });
-        });
-      });
-    });
+// ─── Cập nhật Avatar ─────────────────────────────────────────────────────────
+export const updateAvatar = createAsyncThunk(
+  "auth/updateAvatar",
+  async ({ avatar }, { rejectWithValue }) => {
+    try {
+      const res = await profileService.updateAvatar(avatar);
+      return res.avatar || avatar; // trả về avatar từ response hoặc gửi vào để cập nhật state
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.detail || err.message || "Cập nhật ảnh thất bại.");
+    }
   }
 );
 
-// ─── Đổi mật khẩu (Cognito changePassword) ───────────────────────────────────
+// ─── Cập nhật thông tin cá nhân (Backend API) ────────────────────
+export const updatePersonalInfo = createAsyncThunk(
+  "auth/updatePersonalInfo",
+  async ({ fullname, email, phone, dob }, { rejectWithValue }) => {
+    try {
+      const res = await profileService.updatePersonalInfo({ fullname, email, phone, dob });
+      return { fullname, email, phone, dob };
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || err.message || "Cập nhật thất bại.";
+      return rejectWithValue(errorMsg);
+    }
+  }
+);
+
+// ─── Đổi mật khẩu (Backend API) ───────────────────────────────────
 export const changePassword = createAsyncThunk(
   "auth/changePassword",
   async ({ currentPassword, newPassword }, { rejectWithValue }) => {
-    return new Promise((resolve, reject) => {
-      const cognitoUser = userPool.getCurrentUser();
-      if (!cognitoUser) {
-        return reject(rejectWithValue("Không tìm thấy session. Vui lòng đăng nhập lại."));
-      }
-      cognitoUser.getSession((err, session) => {
-        if (err || !session) {
-          return reject(rejectWithValue("Session hết hạn. Vui lòng đăng nhập lại."));
-        }
-        cognitoUser.changePassword(currentPassword, newPassword, (changeErr) => {
-          if (changeErr) reject(rejectWithValue(changeErr.message || "Đổi mật khẩu thất bại."));
-          else resolve(true);
-        });
-      });
-    });
+    try {
+      const res = await profileService.changePassword({ currentPassword, newPassword });
+      return true;
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || err.message || "Đổi mật khẩu thất bại.";
+      return rejectWithValue(errorMsg);
+    }
   }
 );
 
@@ -262,31 +230,77 @@ const authSlice = createSlice({
       state.error = null;
     });
 
-    // ════════════════════════════════════════
-    // PROFILE — Extra reducers bổ sung
-    // ════════════════════════════════════════
+    // ── Get Profile (load từ DynamoDB) ──
+    builder
+      .addCase(getProfile.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(getProfile.fulfilled, (state, action) => {
+        state.isLoading = false;
+        if (state.user) {
+          state.user = { ...state.user, ...action.payload };
+          sessionStorage.setItem("auth_user", JSON.stringify(state.user));
+        }
+      })
+      .addCase(getProfile.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
 
     // ── Update Avatar ──
-    builder.addCase(updateAvatar.fulfilled, (state, action) => {
-      if (state.user) {
-        state.user.avatar = action.payload;
-        sessionStorage.setItem("auth_user", JSON.stringify(state.user));
-      }
-    });
+    builder
+      .addCase(updateAvatar.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateAvatar.fulfilled, (state, action) => {
+        state.isLoading = false;
+        if (state.user) {
+          state.user.avatar = action.payload;
+          sessionStorage.setItem("auth_user", JSON.stringify(state.user));
+        }
+      })
+      .addCase(updateAvatar.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
 
     // ── Update Personal Info ──
-    builder.addCase(updatePersonalInfo.fulfilled, (state, action) => {
-      if (state.user) {
-        const { fullname, email, phone, dob } = action.payload;
-        state.user.fullname = fullname;
-        state.user.email    = email;
-        state.user.phone    = phone;
-        state.user.dob      = dob;
-        sessionStorage.setItem("auth_user", JSON.stringify(state.user));
-      }
-    });
+    builder
+      .addCase(updatePersonalInfo.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updatePersonalInfo.fulfilled, (state, action) => {
+        state.isLoading = false;
+        if (state.user) {
+          const { fullname, email, phone, dob } = action.payload;
+          state.user.fullname = fullname;
+          state.user.email    = email;
+          state.user.phone    = phone;
+          state.user.dob      = dob;
+          sessionStorage.setItem("auth_user", JSON.stringify(state.user));
+        }
+      })
+      .addCase(updatePersonalInfo.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
 
-    // ── Change Password — không cần cập nhật state ──
+    // ── Change Password ──
+    builder
+      .addCase(changePassword.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(changePassword.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(changePassword.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
   },
 });
 

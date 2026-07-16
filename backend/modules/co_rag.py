@@ -197,6 +197,7 @@ def co_rag_pipeline(
     enable_agent_semantic: bool = True,
     enable_agent_keyword: bool = True,
     enable_agent_conceptual: bool = True,
+    file_filter: Optional[list] = None,
 ) -> Dict[str, Any]:
 
     from modules.rag_chain import format_context, RAG_PROMPT_TEMPLATE
@@ -222,20 +223,36 @@ def co_rag_pipeline(
         language = detect_language(question)
         result["language"] = language
 
+        # Áp dụng file_filter cho raw_documents trước (dùng bởi Keyword/BM25 agent)
+        filtered_raw_documents = raw_documents
+        if file_filter and raw_documents:
+            filtered_raw_documents = [
+                doc for doc in raw_documents
+                if any(f in doc.metadata.get("source", "") for f in file_filter)
+            ]
+
+        def _apply_file_filter(pairs: List[Tuple[Document, float]]) -> List[Tuple[Document, float]]:
+            if not file_filter:
+                return pairs
+            return [
+                (doc, score) for doc, score in pairs
+                if any(f in doc.metadata.get("source", "") for f in file_filter)
+            ]
+
         agent_results: Dict[str, List[Tuple[Document, float]]] = {}
 
         if enable_agent_semantic and vector_store is not None:
-            agent1 = semantic_retriever_agent(question, vector_store, top_k=_top_k)
+            agent1 = _apply_file_filter(semantic_retriever_agent(question, vector_store, top_k=_top_k))
             agent_results["Semantic (FAISS)"] = agent1
             result["co_rag_agent_counts"]["Semantic (FAISS)"] = len(agent1)
 
-        if enable_agent_keyword and raw_documents:
-            agent2 = keyword_retriever_agent(question, raw_documents, top_k=_top_k)
+        if enable_agent_keyword and filtered_raw_documents:
+            agent2 = keyword_retriever_agent(question, filtered_raw_documents, top_k=_top_k)
             agent_results["Keyword (BM25)"] = agent2
             result["co_rag_agent_counts"]["Keyword (BM25)"] = len(agent2)
 
         if enable_agent_conceptual and vector_store is not None:
-            agent3 = conceptual_decomposer_agent(question, vector_store, llm, top_k=_top_k)
+            agent3 = _apply_file_filter(conceptual_decomposer_agent(question, vector_store, llm, top_k=_top_k))
             agent_results["Conceptual (LLM)"] = agent3
             result["co_rag_agent_counts"]["Conceptual (LLM)"] = len(agent3)
 
