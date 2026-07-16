@@ -1,7 +1,24 @@
 .env
 
-# dependencies
+# Node dependencies (không push node_modules)
 node_modules/
 
-# build
+# Build output (được tự build lại qua buildspec.yml / npm run build)
 dist/
+build/
+
+# Python cache/venv
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Backend runtime artifacts cục bộ (không cần cho deploy Lambda, chứa dữ liệu người dùng test)
+backend/data/
+backend/vectorstore/
+backend/static/libs/
+
+# OS/Editor
+.DS_Store
+Thumbs.db
