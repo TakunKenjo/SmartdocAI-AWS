@@ -3,15 +3,23 @@ version: 0.2
 phases:
   install:
     commands:
+      # Di chuyển vào đúng thư mục chứa source code FE
       - cd smart-docs-ai/smart-docs-ai
       - npm ci
 
   build:
     commands:
+      # Thực hiện build ra thư mục dist
       - npm run build
+
+  post_build:
+    commands:
+      # CHỈ chạy xóa cache CloudFront tại đây sau khi mọi thứ ở phase build đã hoàn tất thành công
       - aws cloudfront create-invalidation --distribution-id E5QRZJSUK0QTJ --paths "/*"
 
 artifacts:
+  # Kiểm tra kỹ xem thư mục dist nằm ở đâu sau khi build trên môi trường của bạn.
+  # Nếu lúc trước chạy bình thường với đường dẫn này thì giữ nguyên:
   base-directory: smart-docs-ai/smart-docs-ai/dist
   files:
     - '**/*'
