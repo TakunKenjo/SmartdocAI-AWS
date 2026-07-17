@@ -1,0 +1,33 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_REGION: us-east-1
+    IMAGE_REPO_NAME: smartdocai
+    IMAGE_TAG: latest
+    LAMBDA_FUNCTION_NAME: smartdocai
+
+
+phases:
+
+  pre_build:
+    commands:
+      - echo Login ECR
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
+
+
+  build:
+    commands:
+      - echo Building Docker image
+      - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG -f backend/Dockerfile backend
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $REPOSITORY_URI:$IMAGE_TAG
+
+
+  post_build:
+    commands:
+      - echo Push image
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Deploy Lambda
+      - aws lambda update-function-code --function-name $LAMBDA_FUNCTION_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG

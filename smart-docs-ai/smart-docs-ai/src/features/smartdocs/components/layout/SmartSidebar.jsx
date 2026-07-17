@@ -1,7 +1,7 @@
 import { useEffect, useContext, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router";
-import { BrainCircuit, RefreshCw, Sun, Moon, PanelLeftClose, PanelLeftOpen, LogOut, X, UserCircle } from "lucide-react";
+import { BrainCircuit, RefreshCw, Sun, Moon, PanelLeftClose, PanelLeftOpen, LogOut, X } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
 import { ThemeContext } from "@/contexts/ThemeContext.jsx";
@@ -38,6 +38,10 @@ function SmartSidebar({ mobileOpen = false, onMobileClose = () => {} }) {
   const processedFiles = useSelector(selectProcessedFiles);
   const totalChunks = useSelector(selectTotalChunks);
   const authUser = useSelector(selectAuthUser);
+
+  // Helper: lấy 2 chữ cái đầu tên
+  const getInitials = (fullname = "") =>
+    fullname.trim().split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U";
 
   const handleLogout = async () => {
     await dispatch(logout());
@@ -195,16 +199,24 @@ function SmartSidebar({ mobileOpen = false, onMobileClose = () => {} }) {
       }`}>
         {collapsed ? (
           <div className="flex flex-col gap-2 items-center">
-            {/* Profile icon — collapsed */}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9 text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors"
+            {/* Avatar button — collapsed */}
+            <button
               onClick={() => { onMobileClose(); navigate("/app/profile"); }}
               title="Hồ sơ cá nhân"
+              className="h-9 w-9 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-slate-200 dark:ring-slate-700 hover:ring-blue-400 transition-all focus:outline-none"
             >
-              <UserCircle className="h-4 w-4" />
-            </Button>
+              {authUser?.avatar ? (
+                <img
+                  src={authUser.avatar}
+                  alt="Avatar"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center text-[10px] font-bold text-white">
+                  {getInitials(authUser?.fullname)}
+                </div>
+              )}
+            </button>
             {/* Logout icon — collapsed */}
             <Button
               size="icon"
@@ -218,7 +230,25 @@ function SmartSidebar({ mobileOpen = false, onMobileClose = () => {} }) {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            {/* Avatar + tên user */}
+            {/* Avatar + tên user — expanded */}
+            <button
+              onClick={() => { onMobileClose(); navigate("/app/profile"); }}
+              title="Xem hồ sơ"
+              className="h-9 w-9 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-slate-200 dark:ring-slate-700 hover:ring-blue-400 transition-all focus:outline-none"
+            >
+              {authUser?.avatar ? (
+                <img
+                  src={authUser.avatar}
+                  alt="Avatar"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center text-[10px] font-bold text-white">
+                  {getInitials(authUser?.fullname)}
+                </div>
+              )}
+            </button>
+            {/* Tên + email */}
             <button
               onClick={() => { onMobileClose(); navigate("/app/profile"); }}
               className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
@@ -231,16 +261,6 @@ function SmartSidebar({ mobileOpen = false, onMobileClose = () => {} }) {
                 {authUser?.email || ""}
               </p>
             </button>
-            {/* Profile button — expanded */}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 flex-shrink-0 text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
-              onClick={() => { onMobileClose(); navigate("/app/profile"); }}
-              title="Hồ sơ cá nhân"
-            >
-              <UserCircle className="h-4 w-4" />
-            </Button>
             {/* Logout button — expanded */}
             <Button
               size="icon"

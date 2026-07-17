@@ -1,20 +1,56 @@
 import axiosClient from "@/api/axiosConfig.js";
 
 /**
- * profileService — API calls liên quan đến hồ sơ người dùng
- * Dùng axiosClient (đã có Cognito token interceptor)
+ * [SmartDocAI-Profile] profileService — API calls liên quan đến hồ sơ người dùng
+ * Dùng axiosClient (đã có token interceptor tự động gắn Bearer token)
+ * Backend: http://localhost:8000/api/profile/*
  */
 export const profileService = {
   /**
+   * GET /api/profile
+   * Lấy thông tin hồ sơ của người dùng hiện tại
+   */
+  getProfile: async () => {
+    const res = await axiosClient.get("/api/profile");
+    return res.data;
+  },
+
+  /**
+   * PUT /api/profile/personal-info
+   * Cập nhật thông tin cá nhân: fullname, email, phone, dob
+   * @param {object} data - { fullname, email, phone, dob }
+   */
+  updatePersonalInfo: async (data) => {
+    const res = await axiosClient.put("/api/profile/personal-info", {
+      fullname: data.fullname,
+      email: data.email,
+      phone: data.phone,
+      dob: data.dob,
+    });
+    return res.data;
+  },
+
+  /**
    * PUT /api/profile/avatar
-   * Gửi avatar dạng base64 lên backend để lưu trữ
-   * @param {string} userId - Cognito sub (user ID)
+   * Gửi avatar dạng base64 lên backend để lưu trữ (DynamoDB nếu < 300KB, S3 nếu > 300KB)
    * @param {string} avatarBase64 - Chuỗi base64 "data:image/jpeg;base64,..."
    */
-  updateAvatar: async (userId, avatarBase64) => {
+  updateAvatar: async (avatarBase64) => {
     const res = await axiosClient.put("/api/profile/avatar", {
-      user_id: userId,
       avatar: avatarBase64,
+    });
+    return res.data;
+  },
+
+  /**
+   * POST /api/profile/change-password
+   * Đổi mật khẩu
+   * @param {object} data - { current_password, new_password }
+   */
+  changePassword: async (data) => {
+    const res = await axiosClient.post("/api/profile/change-password", {
+      current_password: data.currentPassword,
+      new_password: data.newPassword,
     });
     return res.data;
   },

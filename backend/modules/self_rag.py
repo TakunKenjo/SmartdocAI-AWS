@@ -282,6 +282,7 @@ def self_rag_pipeline(
     enable_query_rewrite: bool = True,
     enable_relevance_filter: bool = True,
     enable_answer_grading: bool = True,
+    file_filter: Optional[list] = None,
 ) -> Dict[str, Any]:
     """
     Pipeline Self-RAG đầy đủ:
@@ -297,6 +298,7 @@ def self_rag_pipeline(
         llm: ChatBedrock instance
         top_k: Số kết quả mỗi lần retrieve
         enable_*: Bật/tắt từng bước
+        file_filter: Danh sách filename để chỉ tìm kiếm trong các file đó (None/[] = tìm toàn bộ)
 
     Returns:
         dict đầy đủ kết quả Self-RAG
@@ -342,6 +344,13 @@ def self_rag_pipeline(
                     seen_contents.add(key)
                     all_doc_score_pairs.append((doc, score))
 
+        # Áp dụng file_filter ngay sau khi retrieve, trước relevance filtering
+        if file_filter:
+            all_doc_score_pairs = [
+                (doc, score) for doc, score in all_doc_score_pairs
+                if any(f in doc.metadata.get("source", "") for f in file_filter)
+            ]
+
         all_docs = [doc for doc, _ in all_doc_score_pairs]
         result["docs_before_filter"] = len(all_docs)
 
@@ -361,6 +370,11 @@ def self_rag_pipeline(
             result["used_multihop"] = True
             for sub_q in multihop["sub_questions"][:2]:
                 extra_pairs = similarity_search_with_scores(vector_store, sub_q, top_k=2)
+                if file_filter:
+                    extra_pairs = [
+                        (doc, score) for doc, score in extra_pairs
+                        if any(f in doc.metadata.get("source", "") for f in file_filter)
+                    ]
                 for doc, score in extra_pairs:
                     key = doc.page_content[:100]
                     if key not in seen_contents:

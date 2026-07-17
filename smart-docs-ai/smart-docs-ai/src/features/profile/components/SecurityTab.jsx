@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useSelector } from "react-redux";
-import React, { useState } from "react";
+import React, { useState, useCallback, memo } from "react";
 import { useDispatch } from "react-redux";
 import { toast } from "sonner";
 import { changePassword } from "@/store/slices/authSlice";
@@ -25,6 +25,40 @@ const inputClass = (hasError) =>
 const labelClass =
   "text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1";
 
+// ── PasswordField Component (memoized để tránh re-render) ──
+const FieldError = memo(({ field, error }) =>
+  error ? (
+    <p className="text-red-400 text-[11px] mt-1 flex items-center gap-1">
+      <span>⚠</span> {error}
+    </p>
+  ) : null
+);
+
+const PasswordField = memo(({ label, value, onChange, show, onToggle, field, error, placeholder }) => (
+  <div>
+    <label className={labelClass}>{label}</label>
+    <div className="relative mt-1">
+      <Input
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        autoComplete="off"
+        spellCheck="false"
+        className={[inputClass(!!error), "pr-10"].join(" ")}
+        placeholder={placeholder}
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+    <FieldError field={field} error={error} />
+  </div>
+));
+
 const SecurityTab = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
@@ -39,6 +73,33 @@ const SecurityTab = () => {
 
   const [errors,       setErrors]       = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCurrentPasswordChange = useCallback((e) => {
+    setCurrentPassword(e.target.value);
+    setErrors((prev) => ({ ...prev, currentPassword: null }));
+  }, []);
+
+  const handleNewPasswordChange = useCallback((e) => {
+    setNewPassword(e.target.value);
+    setErrors((prev) => ({ ...prev, newPassword: null }));
+  }, []);
+
+  const handleConfirmPasswordChange = useCallback((e) => {
+    setConfirmPassword(e.target.value);
+    setErrors((prev) => ({ ...prev, confirmPassword: null }));
+  }, []);
+
+  const handleToggleShowCurrent = useCallback(() => {
+    setShowCurrent((prev) => !prev);
+  }, []);
+
+  const handleToggleShowNew = useCallback(() => {
+    setShowNew((prev) => !prev);
+  }, []);
+
+  const handleToggleShowConfirm = useCallback(() => {
+    setShowConfirm((prev) => !prev);
+  }, []);
 
   const validateForm = () => {
     const newErrors = {};
@@ -58,7 +119,6 @@ const SecurityTab = () => {
 
   const handleChangePassword = async () => {
     if (!validateForm()) return;
-    if (!user?.id) { toast.error("Không tìm thấy user!"); return; }
     setIsSubmitting(true);
     try {
       await dispatch(changePassword({ currentPassword, newPassword })).unwrap();
@@ -70,37 +130,6 @@ const SecurityTab = () => {
       setIsSubmitting(false);
     }
   };
-
-  const FieldError = ({ field }) =>
-    errors[field] ? (
-      <p className="text-red-400 text-[11px] mt-1 flex items-center gap-1">
-        <span>⚠</span> {errors[field]}
-      </p>
-    ) : null;
-
-  // Input mật khẩu có nút show/hide
-  const PasswordField = ({ label, value, onChange, show, onToggle, field, placeholder }) => (
-    <div>
-      <label className={labelClass}>{label}</label>
-      <div className="relative mt-1">
-        <Input
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={onChange}
-          className={[inputClass(errors[field]), "pr-10"].join(" ")}
-          placeholder={placeholder}
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-        >
-          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
-      </div>
-      <FieldError field={field} />
-    </div>
-  );
 
   return (
     <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
@@ -116,30 +145,30 @@ const SecurityTab = () => {
         <PasswordField
           label="Mật khẩu hiện tại"
           value={currentPassword}
-          onChange={(e) => { setCurrentPassword(e.target.value); if (errors.currentPassword) setErrors({ ...errors, currentPassword: null }); }}
+          onChange={handleCurrentPasswordChange}
           show={showCurrent}
-          onToggle={() => setShowCurrent(!showCurrent)}
-          field="currentPassword"
+          onToggle={handleToggleShowCurrent}
+          error={errors.currentPassword}
           placeholder="••••••••"
         />
 
         <PasswordField
           label="Mật khẩu mới"
           value={newPassword}
-          onChange={(e) => { setNewPassword(e.target.value); if (errors.newPassword) setErrors({ ...errors, newPassword: null }); }}
+          onChange={handleNewPasswordChange}
           show={showNew}
-          onToggle={() => setShowNew(!showNew)}
-          field="newPassword"
+          onToggle={handleToggleShowNew}
+          error={errors.newPassword}
           placeholder="Tối thiểu 6 ký tự"
         />
 
         <PasswordField
           label="Xác nhận mật khẩu mới"
           value={confirmPassword}
-          onChange={(e) => { setConfirmPassword(e.target.value); if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: null }); }}
+          onChange={handleConfirmPasswordChange}
           show={showConfirm}
-          onToggle={() => setShowConfirm(!showConfirm)}
-          field="confirmPassword"
+          onToggle={handleToggleShowConfirm}
+          error={errors.confirmPassword}
           placeholder="Nhập lại mật khẩu mới"
         />
 

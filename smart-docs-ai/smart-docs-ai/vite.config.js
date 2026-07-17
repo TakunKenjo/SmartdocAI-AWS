@@ -20,7 +20,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'https://d60866voq5.execute-api.us-east-1.amazonaws.com/prod',
+        target: 'https://nxmlsvv3zk.execute-api.us-east-1.amazonaws.com/prod/',
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path,
