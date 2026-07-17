@@ -2,6 +2,11 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
 import { userPool } from "@/api/cognito.js";
 import { profileService } from "@/api/services/profileService.js";
+import {
+  exchangeCodeForTokens,
+  decodeJwtPayload,
+  persistCognitoSession,
+} from "@/api/cognitoOAuth.js";
 import axiosClient from "@/api/axiosConfig.js";
 
 // ─── Đăng nhập Cognito ──────────────────────────────────────────────────────────
@@ -13,14 +18,16 @@ export const login = createAsyncThunk(
         Username: email,
         Password: password,
       };
-      const authenticationDetails = new AuthenticationDetails(authenticationData);
+      const authenticationDetails = new AuthenticationDetails(
+        authenticationData,
+      );
       const userData = {
         Username: email,
         Pool: userPool,
         Storage: userPool.storage,
       };
       const cognitoUser = new CognitoUser(userData);
-      
+
       cognitoUser.authenticateUser(authenticationDetails, {
         onSuccess: (result) => {
           const user = {
@@ -33,13 +40,46 @@ export const login = createAsyncThunk(
           resolve(user);
         },
         onFailure: (err) => {
-          reject(rejectWithValue(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại."));
+          reject(
+            rejectWithValue(
+              err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại.",
+            ),
+          );
         },
       });
     });
-  }
+  },
 );
 
+// ─── Đăng nhập bằng Google (đổi code lấy token thật từ Cognito) ────────────────
+export const loginWithGoogleCode = createAsyncThunk(
+  "auth/loginWithGoogleCode",
+  async (code, { rejectWithValue }) => {
+    try {
+      const tokens = await exchangeCodeForTokens(code);
+      const claims = decodeJwtPayload(tokens.id_token);
+      const username = claims["cognito:username"];
+
+      persistCognitoSession({
+        idToken: tokens.id_token,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        username,
+      });
+
+      const user = {
+        id: claims.sub,
+        email: claims.email,
+        fullname: claims.name || claims.email?.split("@")[0],
+        role: "user",
+      };
+      sessionStorage.setItem("auth_user", JSON.stringify(user));
+      return user;
+    } catch (err) {
+      return rejectWithValue(err.message || "Đăng nhập Google thất bại.");
+    }
+  },
+);
 // ─── Đăng ký (qua Backend API, để đồng bộ DynamoDB) ─────────────────────────────
 export const register = createAsyncThunk(
   "auth/register",
@@ -55,10 +95,10 @@ export const register = createAsyncThunk(
       return { success: true, email: res.data.email ?? email };
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.detail || err.message || "Đăng ký thất bại."
+        err.response?.data?.detail || err.message || "Đăng ký thất bại.",
       );
     }
-  }
+  },
 );
 
 // ─── Xác thực Code Đăng ký (qua Backend API, để đồng bộ DynamoDB) ──────────────
@@ -73,10 +113,12 @@ export const confirmCode = createAsyncThunk(
       return res.data;
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.detail || err.message || "Mã xác thực không chính xác hoặc đã hết hạn."
+        err.response?.data?.detail ||
+          err.message ||
+          "Mã xác thực không chính xác hoặc đã hết hạn.",
       );
     }
-  }
+  },
 );
 
 // ─── Đăng xuất Cognito ────────────────────────────────────────────────────────────
@@ -119,9 +161,11 @@ export const getProfile = createAsyncThunk(
       const res = await profileService.getProfile();
       return res;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.detail || err.message || "Lấy profile thất bại.");
+      return rejectWithValue(
+        err.response?.data?.detail || err.message || "Lấy profile thất bại.",
+      );
     }
-  }
+  },
 );
 
 // ─── Cập nhật Avatar ─────────────────────────────────────────────────────────
@@ -132,9 +176,11 @@ export const updateAvatar = createAsyncThunk(
       const res = await profileService.updateAvatar(avatar);
       return res.avatar || avatar; // trả về avatar từ response hoặc gửi vào để cập nhật state
     } catch (err) {
-      return rejectWithValue(err.response?.data?.detail || err.message || "Cập nhật ảnh thất bại.");
+      return rejectWithValue(
+        err.response?.data?.detail || err.message || "Cập nhật ảnh thất bại.",
+      );
     }
-  }
+  },
 );
 
 // ─── Cập nhật thông tin cá nhân (Backend API) ────────────────────
@@ -142,13 +188,19 @@ export const updatePersonalInfo = createAsyncThunk(
   "auth/updatePersonalInfo",
   async ({ fullname, email, phone, dob }, { rejectWithValue }) => {
     try {
-      const res = await profileService.updatePersonalInfo({ fullname, email, phone, dob });
+      const res = await profileService.updatePersonalInfo({
+        fullname,
+        email,
+        phone,
+        dob,
+      });
       return { fullname, email, phone, dob };
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || err.message || "Cập nhật thất bại.";
+      const errorMsg =
+        err.response?.data?.detail || err.message || "Cập nhật thất bại.";
       return rejectWithValue(errorMsg);
     }
-  }
+  },
 );
 
 // ─── Đổi mật khẩu (Backend API) ───────────────────────────────────
@@ -156,13 +208,17 @@ export const changePassword = createAsyncThunk(
   "auth/changePassword",
   async ({ currentPassword, newPassword }, { rejectWithValue }) => {
     try {
-      const res = await profileService.changePassword({ currentPassword, newPassword });
+      const res = await profileService.changePassword({
+        currentPassword,
+        newPassword,
+      });
       return true;
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || err.message || "Đổi mật khẩu thất bại.";
+      const errorMsg =
+        err.response?.data?.detail || err.message || "Đổi mật khẩu thất bại.";
       return rejectWithValue(errorMsg);
     }
-  }
+  },
 );
 
 // ─── Slice ────────────────────────────────────────────────────────────────────
@@ -188,6 +244,25 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(login.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isAuthenticated = false;
+        state.error = action.payload;
+      });
+
+    // ── Login with Google Code ──
+    // ── Login With Google ──
+    builder
+      .addCase(loginWithGoogleCode.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loginWithGoogleCode.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isAuthenticated = true;
+        state.user = action.payload;
+        state.error = null;
+      })
+      .addCase(loginWithGoogleCode.rejected, (state, action) => {
         state.isLoading = false;
         state.isAuthenticated = false;
         state.error = action.payload;
@@ -276,9 +351,9 @@ const authSlice = createSlice({
         if (state.user) {
           const { fullname, email, phone, dob } = action.payload;
           state.user.fullname = fullname;
-          state.user.email    = email;
-          state.user.phone    = phone;
-          state.user.dob      = dob;
+          state.user.email = email;
+          state.user.phone = phone;
+          state.user.dob = dob;
           sessionStorage.setItem("auth_user", JSON.stringify(state.user));
         }
       })
@@ -306,9 +381,9 @@ const authSlice = createSlice({
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
-export const selectAuthUser       = (state) => state.auth.user;
-export const selectAuthLoading    = (state) => state.auth.isLoading;
-export const selectAuthError      = (state) => state.auth.error;
+export const selectAuthUser = (state) => state.auth.user;
+export const selectAuthLoading = (state) => state.auth.isLoading;
+export const selectAuthError = (state) => state.auth.error;
 
 // ── Profile selectors bổ sung ──
 // selectCurrentUser: alias của selectAuthUser, dùng trong feature/profile
