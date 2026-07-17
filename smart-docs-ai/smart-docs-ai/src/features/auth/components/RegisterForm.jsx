@@ -41,7 +41,20 @@ const RegisterForm = () => {
     } else if (!/^[0-9]{9,11}$/.test(formData.phone.replace(/\s/g, ""))) {
       newErrors.phone = "Số điện thoại không hợp lệ.";
     }
-    if (!formData.dob) newErrors.dob = "Vui lòng chọn ngày sinh.";
+    if (!formData.dob) {
+      newErrors.dob = "Vui lòng chọn ngày sinh.";
+    } else {
+      const dobDate = new Date(formData.dob);
+      const currentYear = new Date().getFullYear();
+      const birthYear = dobDate.getFullYear();
+      if (isNaN(dobDate.getTime())) {
+        newErrors.dob = "Ngày sinh không hợp lệ.";
+      } else if (birthYear < 1900 || birthYear > currentYear) {
+        newErrors.dob = `Năm sinh phải từ 1900 đến ${currentYear}.`;
+      } else if (dobDate > new Date()) {
+        newErrors.dob = "Ngày sinh không được ở tương lai.";
+      }
+    }
     if (!formData.password) {
       newErrors.password = "Vui lòng nhập mật khẩu.";
     } else if (formData.password.length < 6) {
@@ -255,6 +268,8 @@ const RegisterForm = () => {
                 value={formData.dob}
                 onChange={handleChange}
                 className={inputClass("dob")}
+                min="1900-01-01"
+                max={new Date().toISOString().split("T")[0]}
               />
             </div>
             <FieldError field="dob" />
