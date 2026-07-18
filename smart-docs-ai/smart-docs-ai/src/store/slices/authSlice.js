@@ -248,8 +248,6 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.error = action.payload;
       });
-
-    // ── Login with Google Code ──
     // ── Login With Google ──
     builder
       .addCase(loginWithGoogleCode.pending, (state) => {
