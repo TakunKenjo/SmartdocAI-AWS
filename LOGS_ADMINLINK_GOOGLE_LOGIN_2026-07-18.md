@@ -1,0 +1,237 @@
+# Logs AdminLink Google Login - 2026-07-18
+
+## Muc tieu
+
+Hoan tat phase lien ket tai khoan Google OAuth voi user Cognito native da ton tai bang `AdminLinkProviderForUser`, tranh tao duplicate user cung email va giu nguyen du lieu theo `sub` cu.
+
+## Branch va commit lien quan
+
+- Branch lam viec: `phuc-google-login`
+- Remote branch: `origin/phuc`
+- Da merge production qua `origin/main`
+- Commit chinh tren `origin/phuc`:
+  - `a61b2852 feat: link Google sign-in to native Cognito users`
+  - `4fc2b713 chore: store presignup lambda at deployable handler path`
+  - `34791c7f chore: remove tracked Python cache files`
+- Commit chinh tren `origin/main`:
+  - `28b53353 merge: deploy Google Cognito account linking`
+  - `27fb77dc chore: remove tracked Python cache files`
+
+## Thay doi da thuc hien
+
+### 1. Cognito PreSignUp Lambda
+
+- Function AWS: `smartdocai-presignup-check`
+- Runtime: `python3.12`
+- Handler: `lambda_function.lambda_handler`
+- Source da dua vao repo tai: `backend/lambdas/presignup_check/lambda_function.py`
+
+Logic moi:
+
+- Voi `PreSignUp_ExternalProvider`:
+  - Doc email tu event Google OAuth.
+  - Tim native Cognito user co cung email, username native dang la email.
+  - Neu tim thay native user, goi `admin_link_provider_for_user` de link Google identity vao native user.
+  - Set `autoConfirmUser = true` va `autoVerifyEmail = true`.
+  - Neu email moi chua co native user, cho Google signup/login binh thuong.
+
+- Voi `PreSignUp_SignUp`:
+  - Neu email da ton tai o Google-only user va chua co native user, chan native signup voi message: `Email nay da duoc dang nhap bang Google. Vui long dang nhap bang Google.`
+  - Cac case khac cho di tiep.
+
+### 2. IAM cho PreSignUp Lambda
+
+Role: `smartdocai-presignup-role`
+
+Da cap quyen tren user pool `us-east-1_3oq5wIiuu`:
+
+- `cognito-idp:ListUsers`
+- `cognito-idp:AdminLinkProviderForUser`
+
+IAM simulation da tra ve:
+
+- `cognito-idp:ListUsers`: `allowed`
+- `cognito-idp:AdminLinkProviderForUser`: `allowed`
+
+### 3. Backend profile update
+
+File: `backend/app_api.py`
+
+Da them helper `extract_cognito_username_from_token()` de lay dung Cognito username tu JWT:
+
+- Uu tien claim `cognito:username`.
+- Fallback sang `email` neu token khong co `cognito:username`.
+
+Endpoint `PUT /api/profile/personal-info` da doi tu:
+
+```python
+current_username = extract_email_from_token(authorization)
+```
+
+sang:
+
+```python
+current_username = extract_cognito_username_from_token(authorization)
+```
+
+Ly do: Google/federated user co Cognito username dang `Google_xxx`, khong phai email. Neu dung email de goi Cognito `admin_update_user_attributes`, profile update co the fail hoac update sai user.
+
+### 4. Repository hygiene
+
+- Da xoa cac file Python cache bi track nham:
+  - `backend/__pycache__/*.pyc`
+  - `backend/modules/__pycache__/*.pyc`
+- `.gitignore` da co san rule:
+  - `__pycache__/`
+  - `*.pyc`
+
+## Deploy da thuc hien
+
+### PreSignUp Lambda
+
+Da package va deploy function `smartdocai-presignup-check` bang AWS CLI.
+
+Trang thai sau deploy:
+
+- Function: `smartdocai-presignup-check`
+- Handler: `lambda_function.lambda_handler`
+- `LastUpdateStatus`: `Successful`
+- `State`: `Active`
+- Last modified: `2026-07-18T04:17:31.000+0000`
+
+### Backend production Lambda
+
+Da merge branch `origin/phuc` vao `main`, push `main` de CodePipeline backend tu dong deploy.
+
+Pipeline:
+
+- Name: `smartdocai-be-pipeline`
+- Execution moi nhat: `Succeeded`
+- Revision moi nhat: `27fb77dc3d4839e1af813cdf21c0ab33017b79e3`
+
+Main Lambda sau deploy:
+
+- Function: `smartdocai`
+- `LastUpdateStatus`: `Successful`
+- `State`: `Active`
+- Last modified: `2026-07-18T04:26:32.000+0000`
+
+## Test va validation da chay
+
+### 1. Python syntax compile
+
+Da chay:
+
+```powershell
+C:/msys64/ucrt64/bin/python.exe -m py_compile backend/app_api.py backend/lambdas/presignup_check/lambda_function.py
+```
+
+Ket qua: pass, khong co output loi.
+
+### 2. Frontend build
+
+Da chay:
+
+```powershell
+npm run build
+```
+
+Tai thu muc:
+
+```text
+smart-docs-ai/smart-docs-ai
+```
+
+Ket qua: build thanh cong.
+
+Ghi chu: Vite co warning chunk JS lon hon 500 kB, nhung day la warning ve toi uu bundle, khong phai loi build.
+
+### 3. PreSignUp Lambda synthetic invoke
+
+Da invoke `smartdocai-presignup-check` voi event `PreSignUp_SignUp` email gia:
+
+- StatusCode: `200`
+- FunctionError: `None`
+- Output tra lai event goc.
+
+Muc dich: xac nhan zip deploy dung layout `lambda_function.py` o root va handler import duoc.
+
+### 4. AdminLinkProviderForUser test bang Cognito temp user
+
+Da test end-to-end co kiem soat:
+
+1. Tao native Cognito user tam voi email dang:
+   - `smartdocai-adminlink-test-<id>@example.com`
+2. Set password tam de user o trang thai native usable.
+3. Invoke PreSignUp Lambda voi:
+   - `triggerSource = PreSignUp_ExternalProvider`
+   - `userName = Google_test-google-sub-<id>`
+   - cung email voi native user tam.
+4. Lambda tra ve:
+   - `autoConfirmUser = true`
+   - `autoVerifyEmail = true`
+5. Goi `admin-get-user` cho native user, thay attribute `identities` co provider `Google`:
+
+```json
+[
+  {
+    "providerName": "Google",
+    "providerType": "Google",
+    "primary": "false"
+  }
+]
+```
+
+6. Da xoa native user tam sau test.
+
+Ket qua: AdminLinkProviderForUser hoat dong dung voi native user trung email.
+
+### 5. CodePipeline backend
+
+Da kiem tra `smartdocai-be-pipeline` sau khi push `main`.
+
+Ket qua:
+
+- Execution cho commit merge AdminLink: `Succeeded`
+- Execution cho commit cleanup cache: `Succeeded`
+- Source stage: `Succeeded`
+- Build stage: `Succeeded`
+
+### 6. Production API smoke test
+
+Da goi API Gateway production root:
+
+```text
+https://nxmlsvv3zk.execute-api.us-east-1.amazonaws.com/prod/
+```
+
+Ket qua: HTTP `404`.
+
+Giai thich: root route khong ton tai nen `404` la expected. Diem quan trong la Lambda import/startup khong crash.
+
+## Viec chua the tu dong test het
+
+Chua test duoc login Google that bang browser/tai khoan Google cua user vi luong OAuth can phien browser va Google account that.
+
+Can test thu cong:
+
+1. Lay mot email da co native Cognito account.
+2. Dang nhap bang Google cung email do.
+3. Ky vong:
+   - Khong bi block duplicate email.
+   - Khong tao duplicate profile/DynamoDB user moi.
+   - Token sau login tro ve user da link.
+   - Du lieu cu theo native `sub` van con.
+4. Thu update profile sau Google login.
+5. Ky vong endpoint `PUT /api/profile/personal-info` khong con loi Cognito username mismatch.
+
+## Ket luan
+
+Phase ha tang va backend cho Google account linking da hoan tat:
+
+- IAM da du quyen.
+- PreSignUp Lambda da live va runtime-tested.
+- AdminLinkProviderForUser da duoc validate bang Cognito temp user.
+- Backend profile update fix da deploy production.
+- CodePipeline backend da succeeded.
+- Repo da co source Lambda va da cleanup cache artifacts.
