@@ -389,3 +389,52 @@ Validation:
 - Test authorize URL voi redirect URI `localhost:5173`, `5174`, `5175`, `5176`.
 - Tat ca deu tra `302` sang `https://accounts.google.com/o/oauth2/v2/auth...`.
 - Khong con redirect ve `/error?error=redirect_mismatch`.
+
+## Follow-up: Google user da set password nhung login email/password bao `User does not exist`
+
+Sau khi Google-only user thiet lap password thanh cong, thu login bang email/password co the gap loi:
+
+```text
+User does not exist.
+```
+
+Nguyen nhan Cognito:
+
+- User pool hien tai khong bat `UsernameAttributes` hay `AliasAttributes` cho email.
+- Native user login duoc bang email vi username native duoc tao bang chinh email.
+- Google-only user co Cognito Username that dang `Google_<provider-sub>`.
+- Khi set password cho Google user bang `AdminSetUserPassword`, user co password native nhung username van la `Google_<provider-sub>`.
+- Login form gui `Username=email`, Cognito khong map email sang `Google_<provider-sub>`, nen tra `User does not exist`.
+
+Da sua voi commit:
+
+- `36c3df04 fix: resolve Cognito username for Google password login`
+
+Thay doi:
+
+- Backend them endpoint `POST /api/auth/resolve-login-username`.
+- Backend resolve Cognito Username bang email qua `list_users`.
+- Uu tien native username=email neu ton tai; neu khong thi tra federated username nhu `Google_...`.
+- Frontend login thu email truoc nhu cu.
+- Neu Cognito tra `UserNotFoundException`, frontend goi endpoint resolve username roi retry login bang username that.
+
+Deploy:
+
+- Merge len `main` voi commit `1643dfad merge: deploy Google password login username resolve`.
+- CodePipeline `smartdocai-be-pipeline` execution `b198dc3a-61d7-4477-b3e9-d06df38eac79` da `Succeeded`.
+- Lambda `smartdocai` update `Successful`, `Active`, LastModified `2026-07-18T05:16:14.000+0000`.
+
+Validation:
+
+- Python compile: pass.
+- Frontend build: pass.
+- Production endpoint `/api/auth/resolve-login-username` voi email dung `spixztworldwide@gmail.com` tra:
+
+```json
+{"success": true, "username": "Google_100697660162027653937"}
+```
+
+Ghi chu debug:
+
+- Email dung trong DynamoDB/profile la `spixztworldwide@gmail.com`.
+- Lan test bi loi da go `spizxtworldwide@gmail.com` nen resolver tra `Nguoi dung khong ton tai` la dung.
