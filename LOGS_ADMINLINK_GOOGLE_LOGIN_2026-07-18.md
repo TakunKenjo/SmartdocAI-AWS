@@ -116,6 +116,68 @@ Main Lambda sau deploy:
 - `State`: `Active`
 - Last modified: `2026-07-18T04:26:32.000+0000`
 
+## Ghi chu thao tac AWS da thuc hien
+
+Tat ca thao tac AWS trong phase nay duoc thuc hien bang AWS CLI tu local terminal, khong thao tac truc tiep tren AWS Console UI.
+
+### IAM
+
+- Kiem tra inline policy hien co cua role `smartdocai-presignup-role`.
+- Cap nhat inline policy `AllowListUsersForDuplicateEmailCheck` cho role `smartdocai-presignup-role`.
+- Them action `cognito-idp:AdminLinkProviderForUser` ben canh action cu `cognito-idp:ListUsers`.
+- Scope resource vao user pool:
+  - `arn:aws:cognito-idp:us-east-1:623035187993:userpool/us-east-1_3oq5wIiuu`
+- Chay IAM simulation de xac nhan ca hai action deu `allowed`.
+
+### Cognito User Pool
+
+- User pool lien quan: `us-east-1_3oq5wIiuu`.
+- Kiem tra va dung PreSignUp trigger hien co: `smartdocai-presignup-check`.
+- Khong tao user production that nao cho test.
+- Co tao mot native Cognito user tam voi email dang `smartdocai-adminlink-test-<id>@example.com` de validate AdminLink.
+- Sau khi xac nhan attribute `identities` co provider `Google`, da xoa user tam bang `admin-delete-user`.
+
+### Lambda PreSignUp Trigger
+
+- Download code hien tai cua function `smartdocai-presignup-check` de doc logic cu truoc khi thay.
+- Logic cu: neu Google login trung native email thi raise exception va chan login.
+- Logic moi: neu Google login trung native email thi goi `admin_link_provider_for_user` de link vao native user.
+- Package source thanh zip co `lambda_function.py` o root.
+- Deploy bang `aws lambda update-function-code` cho function `smartdocai-presignup-check`.
+- Kiem tra sau deploy bang `aws lambda get-function-configuration`:
+  - Handler: `lambda_function.lambda_handler`
+  - Runtime: `python3.12`
+  - State: `Active`
+  - LastUpdateStatus: `Successful`
+- Invoke synthetic event de xac nhan runtime khong loi import/handler.
+
+### CodePipeline va CodeBuild
+
+- Push `main` de trigger pipeline backend `smartdocai-be-pipeline`.
+- Kiem tra execution bang `aws codepipeline list-pipeline-executions`.
+- Kiem tra stage bang `aws codepipeline get-pipeline-state`.
+- Lay CodeBuild external execution id tu action `Build`.
+- Kiem tra build bang `aws codebuild batch-get-builds`.
+- Doc CloudWatch logs cua CodeBuild khi build dang chay bang `aws logs get-log-events`.
+- Ket qua cuoi:
+  - Source stage: `Succeeded`
+  - Build stage: `Succeeded`
+  - Pipeline execution moi nhat: `Succeeded`
+
+### Lambda Backend Production
+
+- CodePipeline build va deploy image moi cho Lambda `smartdocai`.
+- Kiem tra sau deploy bang `aws lambda get-function-configuration`:
+  - Function: `smartdocai`
+  - State: `Active`
+  - LastUpdateStatus: `Successful`
+- Goi smoke test API Gateway production root de xac nhan Lambda khong crash luc import/startup.
+
+### CloudWatch Logs
+
+- Dung CloudWatch Logs cua CodeBuild de theo doi build Docker image backend.
+- PreSignUp Lambda runtime test tra `StatusCode=200`, `FunctionError=None`, nen khong can debug traceback Lambda trong phase nay.
+
 ## Test va validation da chay
 
 ### 1. Python syntax compile
