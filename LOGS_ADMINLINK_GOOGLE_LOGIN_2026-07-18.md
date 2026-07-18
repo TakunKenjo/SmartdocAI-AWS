@@ -329,3 +329,63 @@ Ket qua:
 - Python compile: pass.
 - Frontend build: pass.
 - Vite van co warning chunk JS > 500 kB, khong phai loi build.
+
+### Follow-up bo sung: linked Google user van hien form native password
+
+Sau khi test tiep, UI van hien `Mat khau hien tai` voi mot Google/linked user. Nguyen nhan co the la session `auth_user` cu chua co `authProvider`, hoac sau khi `AdminLinkProviderForUser` thanh cong Cognito tra `cognito:username` theo native username thay vi `Google_xxx`.
+
+Da sua them voi commit:
+
+- `e5785c23 fix: detect linked Google users from token claims`
+
+Thay doi:
+
+- Frontend `SecurityTab` doc ID token dang luu trong `sessionStorage`.
+- Neu token co `cognito:username` bat dau bang `Google_`, hoac claim `identities` co `providerName/providerType = Google`, UI se coi la Google/linked user.
+- Backend `/api/profile/change-password` cung decode token claims va tu suy luan Google identity tu `identities`, khong chi tin vao flag frontend.
+
+Validation da chay lai:
+
+```powershell
+C:/msys64/ucrt64/bin/python.exe -m py_compile backend/app_api.py backend/modules/profile_service.py
+npm run build
+```
+
+Ket qua: ca backend compile va frontend build deu pass.
+
+## Follow-up: Cognito Hosted UI bao `Login pages unavailable`
+
+Khi dang nhap Google, Cognito Hosted UI hien man hinh:
+
+```text
+Login pages unavailable
+Please contact an administrator.
+```
+
+Nguyen nhan xac dinh:
+
+- Frontend tao Google OAuth URL bang `window.location.origin`.
+- Cognito app client ban dau chi co callback URL `http://localhost:5173/auth/callback`.
+- Neu Vite dev server chay sang port khac nhu `5174`, `5175`, `5176`, redirect URI khong nam trong allowlist.
+- Cognito tra ve `/error?error=redirect_mismatch&client_id=...`, hien thi thanh man `Login pages unavailable`.
+
+Thao tac AWS da lam:
+
+- Cap nhat app client `63f74h4dj78kqihhoimv4acl8a` trong user pool `us-east-1_3oq5wIiuu`.
+- Them callback URLs local dev:
+  - `http://localhost:5173/auth/callback`
+  - `http://localhost:5174/auth/callback`
+  - `http://localhost:5175/auth/callback`
+  - `http://localhost:5176/auth/callback`
+  - `http://127.0.0.1:5173/auth/callback`
+  - `http://127.0.0.1:5174/auth/callback`
+  - `http://127.0.0.1:5175/auth/callback`
+  - `http://127.0.0.1:5176/auth/callback`
+- Them logout URLs tuong ung cho `/login` tren cac origin tren.
+- Giu OAuth flow `code`, scopes `openid email profile`, IdP `COGNITO` va `Google`.
+
+Validation:
+
+- Test authorize URL voi redirect URI `localhost:5173`, `5174`, `5175`, `5176`.
+- Tat ca deu tra `302` sang `https://accounts.google.com/o/oauth2/v2/auth...`.
+- Khong con redirect ve `/error?error=redirect_mismatch`.
