@@ -329,3 +329,26 @@ Ket qua:
 - Python compile: pass.
 - Frontend build: pass.
 - Vite van co warning chunk JS > 500 kB, khong phai loi build.
+
+### Follow-up bo sung: linked Google user van hien form native password
+
+Sau khi test tiep, UI van hien `Mat khau hien tai` voi mot Google/linked user. Nguyen nhan co the la session `auth_user` cu chua co `authProvider`, hoac sau khi `AdminLinkProviderForUser` thanh cong Cognito tra `cognito:username` theo native username thay vi `Google_xxx`.
+
+Da sua them voi commit:
+
+- `e5785c23 fix: detect linked Google users from token claims`
+
+Thay doi:
+
+- Frontend `SecurityTab` doc ID token dang luu trong `sessionStorage`.
+- Neu token co `cognito:username` bat dau bang `Google_`, hoac claim `identities` co `providerName/providerType = Google`, UI se coi la Google/linked user.
+- Backend `/api/profile/change-password` cung decode token claims va tu suy luan Google identity tu `identities`, khong chi tin vao flag frontend.
+
+Validation da chay lai:
+
+```powershell
+C:/msys64/ucrt64/bin/python.exe -m py_compile backend/app_api.py backend/modules/profile_service.py
+npm run build
+```
+
+Ket qua: ca backend compile va frontend build deu pass.
