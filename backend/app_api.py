@@ -1208,8 +1208,9 @@ class AvatarRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     """Đổi mật khẩu"""
-    current_password: str
+    current_password: Optional[str] = None
     new_password: str
+    is_google_user: bool = False
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────
@@ -1281,37 +1282,17 @@ def change_password(
 ):
     """POST /api/profile/change-password — Đổi mật khẩu"""
     try:
-        import json
-        import base64
-        
-        # Extract email từ JWT token
-        if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Token không hợp lệ")
-        
-        token = authorization.replace("Bearer ", "").strip()
-        parts = token.split(".")
-        if len(parts) != 3:
-            raise ValueError("Token format không hợp lệ")
-        
-        payload = parts[1]
-        padding = 4 - len(payload) % 4
-        if padding != 4:
-            payload += "=" * padding
-        
-        decoded = base64.urlsafe_b64decode(payload)
-        claims = json.loads(decoded)
-        
-        user_id = claims.get("sub")
-        email = claims.get("email")
-        
-        if not user_id:
-            raise ValueError("Token không chứa 'sub' claim")
+        user_id = extract_user_id_from_token(authorization)
+        email = extract_email_from_token(authorization)
+        current_username = extract_cognito_username_from_token(authorization)
         
         result = profile_service.change_password(
             user_id=user_id,
             email=email,
+            current_username=current_username,
             current_password=data.current_password,
-            new_password=data.new_password
+            new_password=data.new_password,
+            is_google_user=data.is_google_user,
         )
         return result
         

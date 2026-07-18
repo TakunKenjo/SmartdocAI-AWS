@@ -45,12 +45,13 @@ export const profileService = {
   /**
    * POST /api/profile/change-password
    * Đổi mật khẩu
-   * @param {object} data - { current_password, new_password }
+   * @param {object} data - { currentPassword, newPassword, isGoogleUser }
    */
   changePassword: async (data) => {
     const res = await axiosClient.post("/api/profile/change-password", {
       current_password: data.currentPassword,
       new_password: data.newPassword,
+      is_google_user: data.isGoogleUser,
     });
     return res.data;
   },
