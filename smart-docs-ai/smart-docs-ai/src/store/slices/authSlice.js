@@ -11,47 +11,66 @@ import {
 import axiosClient from "@/api/axiosConfig.js";
 
 // ─── Đăng nhập Cognito ──────────────────────────────────────────────────────────
+const authenticateWithUsername = ({ username, email, password }) =>
+  new Promise((resolve, reject) => {
+    const authenticationDetails = new AuthenticationDetails({
+      Username: username,
+      Password: password,
+    });
+    const userData = {
+      Username: username,
+      Pool: userPool,
+      Storage: userPool.storage,
+    };
+    const cognitoUser = new CognitoUser(userData);
+
+    cognitoUser.authenticateUser(authenticationDetails, {
+      onSuccess: (result) => {
+        const payload = result.getIdToken().payload;
+        const user = {
+          id: payload.sub,
+          email: payload.email || email,
+          fullname: payload.name || email.split("@")[0],
+          authProvider: payload.identities ? "google" : "cognito",
+          cognitoUsername: payload["cognito:username"] || username,
+          role: "user",
+        };
+        sessionStorage.setItem("auth_user", JSON.stringify(user));
+        resolve(user);
+      },
+      onFailure: reject,
+    });
+  });
+
 export const login = createAsyncThunk(
   "auth/login",
   async ({ email, password }, { rejectWithValue }) => {
-    return new Promise((resolve, reject) => {
-      const authenticationData = {
-        Username: email,
-        Password: password,
-      };
-      const authenticationDetails = new AuthenticationDetails(
-        authenticationData,
-      );
-      const userData = {
-        Username: email,
-        Pool: userPool,
-        Storage: userPool.storage,
-      };
-      const cognitoUser = new CognitoUser(userData);
+    try {
+      return await authenticateWithUsername({ username: email, email, password });
+    } catch (err) {
+      if (err.code !== "UserNotFoundException") {
+        return rejectWithValue(
+          err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại.",
+        );
+      }
 
-      cognitoUser.authenticateUser(authenticationDetails, {
-        onSuccess: (result) => {
-          const user = {
-            id: result.getIdToken().payload.sub,
-            email: result.getIdToken().payload.email,
-            fullname: result.getIdToken().payload.name || email.split("@")[0],
-            authProvider: "cognito",
-            cognitoUsername:
-              result.getIdToken().payload["cognito:username"] || email,
-            role: "user",
-          };
-          sessionStorage.setItem("auth_user", JSON.stringify(user));
-          resolve(user);
-        },
-        onFailure: (err) => {
-          reject(
-            rejectWithValue(
-              err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại.",
-            ),
-          );
-        },
-      });
-    });
+      try {
+        const res = await axiosClient.post("/api/auth/resolve-login-username", {
+          email,
+        });
+        const username = res.data?.username;
+        if (!username || username === email) {
+          return rejectWithValue("User does not exist.");
+        }
+        return await authenticateWithUsername({ username, email, password });
+      } catch (retryErr) {
+        return rejectWithValue(
+          retryErr.response?.data?.detail ||
+            retryErr.message ||
+            "Đăng nhập thất bại. Vui lòng kiểm tra lại.",
+        );
+      }
+    }
   },
 );
 

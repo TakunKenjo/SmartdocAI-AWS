@@ -949,6 +949,11 @@ class ConfirmSignUpRequest(BaseModel):
     confirmation_code: str
 
 
+class ResolveLoginUsernameRequest(BaseModel):
+    """Resolve Cognito Username để login bằng email với Google user đã set password"""
+    email: str
+
+
 class GoogleLoginCheckResponse(BaseModel):
     """Kết quả kiểm tra đăng nhập Google"""
     success: bool
@@ -1060,6 +1065,20 @@ async def check_google_login_email(authorization: str = Header(None)):
         raise
     except Exception as e:
         logger.error(f"[Auth] ❌ Google email check error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/auth/resolve-login-username")
+async def resolve_login_username(request: ResolveLoginUsernameRequest):
+    """
+    Resolve Cognito Username từ email cho user Google-only đã thiết lập password.
+    Native user vẫn trả về chính email vì username native=email.
+    """
+    try:
+        username = auth_service.resolve_login_username_by_email(request.email)
+        return {"success": True, "username": username}
+    except Exception as e:
+        logger.error(f"[Auth] ❌ Resolve login username error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 

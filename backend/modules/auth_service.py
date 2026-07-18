@@ -135,6 +135,35 @@ def has_native_user_with_email(email: str, current_user_id: str) -> bool:
     return False
 
 
+def resolve_login_username_by_email(email: str) -> str:
+    """
+    Resolve Cognito Username từ email để hỗ trợ Google-only user đã thiết lập
+    password. User pool hiện không bật email alias, nên Google user vẫn phải
+    authenticate bằng Username thật dạng Google_xxx thay vì email.
+    """
+    if not email:
+        raise ValueError("Email không được để trống")
+
+    normalized_email = email.strip().lower()
+    cognito = get_cognito_client()
+    response = cognito.list_users(
+        UserPoolId=COGNITO_USER_POOL_ID,
+        Filter=f'email = "{normalized_email}"'
+    )
+
+    users = response.get('Users', [])
+    if not users:
+        raise ValueError("Người dùng không tồn tại")
+
+    native_user = next(
+        (user for user in users if user.get('Username', '').lower() == normalized_email),
+        None,
+    )
+    resolved_user = native_user or users[0]
+
+    return resolved_user.get('Username')
+
+
 # ─── Register ────────────────────────────────────────────────────────────────
 
 def register_user(email, password, fullname, phone, dob):
