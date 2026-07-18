@@ -297,3 +297,35 @@ Phase ha tang va backend cho Google account linking da hoan tat:
 - Backend profile update fix da deploy production.
 - CodePipeline backend da succeeded.
 - Repo da co source Lambda va da cleanup cache artifacts.
+
+## Follow-up: Google user chua co password
+
+Sau khi test UI profile, phat hien Google-only user khong co mat khau hien tai nen khong the dung form doi mat khau cu.
+
+Da sua tren branch `phuc-google-login`, push len `origin/phuc` voi commit:
+
+- `bd1ec0a1 fix: allow Google users to set password`
+
+Thay doi:
+
+- Frontend luu them `authProvider` va `cognitoUsername` vao `auth_user` khi login native/Google.
+- `SecurityTab` nhan dien Google user va doi flow tu `Doi mat khau` sang `Thiet lap mat khau`.
+- Voi Google user, UI an field `Mat khau hien tai` vi tai khoan chua co native password.
+- Request change password gui them `is_google_user` ve backend.
+- Backend `ChangePasswordRequest.current_password` doi thanh optional.
+- Backend `/api/profile/change-password` dung `extract_cognito_username_from_token()` de lay dung Cognito Username.
+- `profile_service.change_password()` dung `current_username or email or user_id` khi goi `admin_set_user_password`.
+- Native user van bi yeu cau nhap `current_password` nhu truoc.
+
+Validation da chay cho follow-up nay:
+
+```powershell
+C:/msys64/ucrt64/bin/python.exe -m py_compile backend/app_api.py backend/modules/profile_service.py
+npm run build
+```
+
+Ket qua:
+
+- Python compile: pass.
+- Frontend build: pass.
+- Vite van co warning chunk JS > 500 kB, khong phai loi build.
