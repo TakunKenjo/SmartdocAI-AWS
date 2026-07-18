@@ -6,6 +6,7 @@ import React, { useState, useCallback, memo } from "react";
 import { useDispatch } from "react-redux";
 import { toast } from "sonner";
 import { changePassword } from "@/store/slices/authSlice";
+import { decodeJwtPayload } from "@/api/cognitoOAuth.js";
 import { Save, Eye, EyeOff } from "lucide-react";
 
 // ── Class dùng chung cho toàn bộ app ─────────────────────────────────────────
@@ -24,6 +25,41 @@ const inputClass = (hasError) =>
 
 const labelClass =
   "text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1";
+
+const getStoredIdTokenClaims = () => {
+  if (typeof sessionStorage === "undefined") return null;
+
+  const idTokenKey = Object.keys(sessionStorage).find(
+    (key) =>
+      key.startsWith("CognitoIdentityServiceProvider.") &&
+      key.endsWith(".idToken"),
+  );
+  if (!idTokenKey) return null;
+
+  try {
+    return decodeJwtPayload(sessionStorage.getItem(idTokenKey));
+  } catch {
+    return null;
+  }
+};
+
+const hasGoogleIdentity = (claims) => {
+  if (!claims) return false;
+  if (claims["cognito:username"]?.startsWith("Google_")) return true;
+
+  let identities = claims.identities;
+  if (typeof identities === "string") {
+    try {
+      identities = JSON.parse(identities);
+    } catch {
+      identities = [];
+    }
+  }
+
+  return Array.isArray(identities) && identities.some((identity) =>
+    identity?.providerName === "Google" || identity?.providerType === "Google"
+  );
+};
 
 // ── PasswordField Component (memoized để tránh re-render) ──
 const FieldError = memo(({ field, error }) =>
@@ -62,8 +98,11 @@ const PasswordField = memo(({ label, value, onChange, show, onToggle, field, err
 const SecurityTab = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const tokenClaims = getStoredIdTokenClaims();
   const isGoogleUser =
-    user?.authProvider === "google" || user?.cognitoUsername?.startsWith("Google_");
+    user?.authProvider === "google" ||
+    user?.cognitoUsername?.startsWith("Google_") ||
+    hasGoogleIdentity(tokenClaims);
 
   const [currentPassword,  setCurrentPassword]  = useState("");
   const [newPassword,      setNewPassword]       = useState("");

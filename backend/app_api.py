@@ -1181,6 +1181,55 @@ def extract_cognito_username_from_token(authorization: str = Header(None)) -> st
         raise HTTPException(status_code=401, detail=f"Token không hợp lệ: {str(e)}")
 
 
+def extract_claims_from_token(authorization: str = Header(None)) -> Dict[str, Any]:
+    """Decode JWT payload để đọc claims phục vụ routing logic backend."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token không hợp lệ")
+
+    try:
+        import base64
+
+        token = authorization.replace("Bearer ", "").strip()
+        parts = token.split(".")
+
+        if len(parts) != 3:
+            raise ValueError("Token format không hợp lệ")
+
+        payload = parts[1]
+        padding = 4 - len(payload) % 4
+        if padding != 4:
+            payload += "=" * padding
+
+        decoded = base64.urlsafe_b64decode(payload)
+        return json.loads(decoded)
+
+    except Exception as e:
+        logger.error(f"[Token] Lỗi decode claims: {e}")
+        raise HTTPException(status_code=401, detail=f"Token không hợp lệ: {str(e)}")
+
+
+def token_has_google_identity(claims: Dict[str, Any]) -> bool:
+    username = claims.get("cognito:username") or ""
+    if username.startswith("Google_"):
+        return True
+
+    identities = claims.get("identities")
+    if isinstance(identities, str):
+        try:
+            identities = json.loads(identities)
+        except json.JSONDecodeError:
+            identities = []
+
+    if not isinstance(identities, list):
+        return False
+
+    return any(
+        identity.get("providerName") == "Google" or identity.get("providerType") == "Google"
+        for identity in identities
+        if isinstance(identity, dict)
+    )
+
+
 
 def require_user_id(authorization: str = Header(None)) -> str:
     """
@@ -1282,9 +1331,13 @@ def change_password(
 ):
     """POST /api/profile/change-password — Đổi mật khẩu"""
     try:
-        user_id = extract_user_id_from_token(authorization)
-        email = extract_email_from_token(authorization)
-        current_username = extract_cognito_username_from_token(authorization)
+        claims = extract_claims_from_token(authorization)
+        user_id = claims.get("sub")
+        email = claims.get("email")
+        current_username = claims.get("cognito:username") or email
+
+        if not user_id:
+            raise ValueError("Token không chứa 'sub' claim")
         
         result = profile_service.change_password(
             user_id=user_id,
@@ -1292,7 +1345,7 @@ def change_password(
             current_username=current_username,
             current_password=data.current_password,
             new_password=data.new_password,
-            is_google_user=data.is_google_user,
+            is_google_user=data.is_google_user or token_has_google_identity(claims),
         )
         return result
         
