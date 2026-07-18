@@ -1143,6 +1143,44 @@ def extract_email_from_token(authorization: str = Header(None)) -> str:
         raise HTTPException(status_code=401, detail=f"Token không hợp lệ: {str(e)}")
 
 
+def extract_cognito_username_from_token(authorization: str = Header(None)) -> str:
+    """
+    Trích xuất Cognito Username thật từ JWT token.
+    Native user thường có username=email; Google/federated user có thể có
+    username dạng Google_xxx. Dùng claim này khi gọi Cognito admin_* APIs.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token không hợp lệ")
+
+    try:
+        import json
+        import base64
+
+        token = authorization.replace("Bearer ", "").strip()
+        parts = token.split(".")
+
+        if len(parts) != 3:
+            raise ValueError("Token format không hợp lệ")
+
+        payload = parts[1]
+        padding = 4 - len(payload) % 4
+        if padding != 4:
+            payload += "=" * padding
+
+        decoded = base64.urlsafe_b64decode(payload)
+        claims = json.loads(decoded)
+
+        username = claims.get("cognito:username") or claims.get("email")
+        if not username:
+            raise ValueError("Token không chứa 'cognito:username' hoặc 'email' claim")
+
+        return username
+
+    except Exception as e:
+        logger.error(f"[Token] Lỗi decode cognito username: {e}")
+        raise HTTPException(status_code=401, detail=f"Token không hợp lệ: {str(e)}")
+
+
 
 def require_user_id(authorization: str = Header(None)) -> str:
     """
@@ -1200,7 +1238,7 @@ def update_personal_info(
     """PUT /api/profile/personal-info — Cập nhật info (name, email, phone, dob)"""
     try:
         user_id = extract_user_id_from_token(authorization)
-        current_username = extract_email_from_token(authorization)
+        current_username = extract_cognito_username_from_token(authorization)
         result = profile_service.update_personal_info(
             user_id=user_id,
             current_username=current_username,
