@@ -482,24 +482,30 @@ def update_avatar(user_id: str, avatar_base64: str, max_size_mb: int = 5) -> Dic
 def change_password(
     user_id: str,
     email: str,
-    current_password: str,
-    new_password: str
+    current_username: str,
+    current_password: Optional[str],
+    new_password: str,
+    is_google_user: bool = False,
 ) -> Dict[str, Any]:
     """
     Đổi mật khẩu người dùng qua Cognito AdminSetUserPassword
     
     Args:
         user_id: Cognito sub
-        email: Email (dùng làm Username cho admin_set_user_password)
-        current_password: Mật khẩu hiện tại (gửi lên nhưng không dùng)
+        email: Email của user
+        current_username: Cognito Username thật từ token
+        current_password: Mật khẩu hiện tại với native user
         new_password: Mật khẩu mới
     
     Returns:
         Success response
     """
     try:
-        if not current_password or not new_password:
-            raise ValueError("Mật khẩu không được để trống")
+        if not new_password:
+            raise ValueError("Mật khẩu mới không được để trống")
+
+        if not is_google_user and not current_password:
+            raise ValueError("Vui lòng nhập mật khẩu hiện tại")
         
         if len(new_password) < 6:
             raise ValueError("Mật khẩu mới phải có ít nhất 6 ký tự")
@@ -509,11 +515,12 @@ def change_password(
         if not user_profile:
             raise ValueError("Không thể tạo/lấy user profile")
         
-        # Set mật khẩu mới qua Cognito admin API (dùng email làm username)
+        # Google-only users do not have a current native password yet, so they
+        # are allowed to set one for the authenticated Cognito account.
         cognito = get_cognito_client()
         cognito.admin_set_user_password(
             UserPoolId=COGNITO_USERPOOL_ID,
-            Username=email if email else user_id,  # Ưu tiên email
+            Username=current_username or email or user_id,
             Password=new_password,
             Permanent=True
         )

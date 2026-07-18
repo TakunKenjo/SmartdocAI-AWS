@@ -35,6 +35,9 @@ export const login = createAsyncThunk(
             id: result.getIdToken().payload.sub,
             email: result.getIdToken().payload.email,
             fullname: result.getIdToken().payload.name || email.split("@")[0],
+            authProvider: "cognito",
+            cognitoUsername:
+              result.getIdToken().payload["cognito:username"] || email,
             role: "user",
           };
           sessionStorage.setItem("auth_user", JSON.stringify(user));
@@ -74,6 +77,8 @@ export const loginWithGoogleCode = createAsyncThunk(
         id: claims.sub,
         email: claims.email,
         fullname: claims.name || claims.email?.split("@")[0],
+        authProvider: "google",
+        cognitoUsername: username,
         role: "user",
       };
       sessionStorage.setItem("auth_user", JSON.stringify(user));
@@ -209,11 +214,12 @@ export const updatePersonalInfo = createAsyncThunk(
 // ─── Đổi mật khẩu (Backend API) ───────────────────────────────────
 export const changePassword = createAsyncThunk(
   "auth/changePassword",
-  async ({ currentPassword, newPassword }, { rejectWithValue }) => {
+  async ({ currentPassword, newPassword, isGoogleUser }, { rejectWithValue }) => {
     try {
       const res = await profileService.changePassword({
         currentPassword,
         newPassword,
+        isGoogleUser,
       });
       return true;
     } catch (err) {

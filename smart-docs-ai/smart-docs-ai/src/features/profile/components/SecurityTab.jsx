@@ -6,6 +6,7 @@ import React, { useState, useCallback, memo } from "react";
 import { useDispatch } from "react-redux";
 import { toast } from "sonner";
 import { changePassword } from "@/store/slices/authSlice";
+import { decodeJwtPayload } from "@/api/cognitoOAuth.js";
 import { Save, Eye, EyeOff } from "lucide-react";
 
 // ── Class dùng chung cho toàn bộ app ─────────────────────────────────────────
@@ -24,6 +25,41 @@ const inputClass = (hasError) =>
 
 const labelClass =
   "text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1";
+
+const getStoredIdTokenClaims = () => {
+  if (typeof sessionStorage === "undefined") return null;
+
+  const idTokenKey = Object.keys(sessionStorage).find(
+    (key) =>
+      key.startsWith("CognitoIdentityServiceProvider.") &&
+      key.endsWith(".idToken"),
+  );
+  if (!idTokenKey) return null;
+
+  try {
+    return decodeJwtPayload(sessionStorage.getItem(idTokenKey));
+  } catch {
+    return null;
+  }
+};
+
+const hasGoogleIdentity = (claims) => {
+  if (!claims) return false;
+  if (claims["cognito:username"]?.startsWith("Google_")) return true;
+
+  let identities = claims.identities;
+  if (typeof identities === "string") {
+    try {
+      identities = JSON.parse(identities);
+    } catch {
+      identities = [];
+    }
+  }
+
+  return Array.isArray(identities) && identities.some((identity) =>
+    identity?.providerName === "Google" || identity?.providerType === "Google"
+  );
+};
 
 // ── PasswordField Component (memoized để tránh re-render) ──
 const FieldError = memo(({ field, error }) =>
@@ -62,6 +98,11 @@ const PasswordField = memo(({ label, value, onChange, show, onToggle, field, err
 const SecurityTab = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const tokenClaims = getStoredIdTokenClaims();
+  const isGoogleUser =
+    user?.authProvider === "google" ||
+    user?.cognitoUsername?.startsWith("Google_") ||
+    hasGoogleIdentity(tokenClaims);
 
   const [currentPassword,  setCurrentPassword]  = useState("");
   const [newPassword,      setNewPassword]       = useState("");
@@ -103,7 +144,7 @@ const SecurityTab = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!currentPassword)
+    if (!isGoogleUser && !currentPassword)
       newErrors.currentPassword = "Vui lòng nhập mật khẩu hiện tại.";
     if (!newPassword)
       newErrors.newPassword = "Vui lòng nhập mật khẩu mới.";
@@ -121,8 +162,8 @@ const SecurityTab = () => {
     if (!validateForm()) return;
     setIsSubmitting(true);
     try {
-      await dispatch(changePassword({ currentPassword, newPassword })).unwrap();
-      toast.success("Đổi mật khẩu thành công!");
+      await dispatch(changePassword({ currentPassword, newPassword, isGoogleUser })).unwrap();
+      toast.success(isGoogleUser ? "Thiết lập mật khẩu thành công!" : "Đổi mật khẩu thành công!");
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
     } catch (error) {
       toast.error("Đã xảy ra lỗi!", { description: error });
@@ -136,21 +177,25 @@ const SecurityTab = () => {
       <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
         <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Bảo mật</p>
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-          Thay đổi mật khẩu đăng nhập của bạn
+          {isGoogleUser
+            ? "Thiết lập mật khẩu để có thể đăng nhập bằng email và mật khẩu"
+            : "Thay đổi mật khẩu đăng nhập của bạn"}
         </p>
       </CardHeader>
 
       <CardContent className="pt-4 space-y-4">
 
-        <PasswordField
-          label="Mật khẩu hiện tại"
-          value={currentPassword}
-          onChange={handleCurrentPasswordChange}
-          show={showCurrent}
-          onToggle={handleToggleShowCurrent}
-          error={errors.currentPassword}
-          placeholder="••••••••"
-        />
+        {!isGoogleUser && (
+          <PasswordField
+            label="Mật khẩu hiện tại"
+            value={currentPassword}
+            onChange={handleCurrentPasswordChange}
+            show={showCurrent}
+            onToggle={handleToggleShowCurrent}
+            error={errors.currentPassword}
+            placeholder="••••••••"
+          />
+        )}
 
         <PasswordField
           label="Mật khẩu mới"
@@ -174,7 +219,9 @@ const SecurityTab = () => {
 
         {/* Info note */}
         <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
-          Mật khẩu mới sẽ được áp dụng cho tất cả thiết bị đăng nhập tiếp theo.
+          {isGoogleUser
+            ? "Sau khi thiết lập, bạn vẫn có thể đăng nhập bằng Google hoặc dùng email và mật khẩu mới."
+            : "Mật khẩu mới sẽ được áp dụng cho tất cả thiết bị đăng nhập tiếp theo."}
         </p>
 
         <div className="pt-1">
@@ -184,7 +231,11 @@ const SecurityTab = () => {
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm h-9 px-5 shadow-sm shadow-blue-600/20 transition-all"
           >
             <Save className="h-3.5 w-3.5 mr-1.5" />
-            {isSubmitting ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
+            {isSubmitting
+              ? "Đang cập nhật..."
+              : isGoogleUser
+                ? "Thiết lập mật khẩu"
+                : "Cập nhật mật khẩu"}
           </Button>
         </div>
       </CardContent>
