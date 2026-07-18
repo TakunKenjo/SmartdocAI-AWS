@@ -48,6 +48,13 @@ export const checkGoogleEmailAllowed = async (idToken) => {
   });
 
   if (!res.ok) {
+    if (res.status === 404 || res.status === 405) {
+      console.warn(
+        "[GoogleLogin] Backend check-email endpoint chưa sẵn sàng, bỏ qua lớp check phụ.",
+      );
+      return { success: true, skipped: true };
+    }
+
     const data = await res.json().catch(() => ({}));
     throw new Error(data.detail || "Không thể đăng nhập bằng Google với email này.");
   }
