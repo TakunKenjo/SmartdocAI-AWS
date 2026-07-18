@@ -86,7 +86,8 @@ def validate_dob(dob: str) -> bool:
     """
     [Validator] Kiểm tra ngày sinh
     - Format: YYYY-MM-DD
-    - Năm: 1900-2025
+    - Năm: 1900 đến năm hiện tại (không hard-code số cứng để tránh lỗi
+      khi năm hệ thống vượt qua mốc cố định, ví dụ 2025 -> 2026)
     - Ngày hợp lệ (leap years, etc.)
     
     Returns: True nếu valid, False nếu invalid
@@ -97,8 +98,9 @@ def validate_dob(dob: str) -> bool:
     try:
         parsed_date = datetime.strptime(dob, "%Y-%m-%d")
         
-        # Check year range (born 1900-2025)
-        if parsed_date.year < 1900 or parsed_date.year > 2025:
+        # Check year range (born 1900 -> năm hiện tại)
+        current_year = datetime.now().year
+        if parsed_date.year < 1900 or parsed_date.year > current_year:
             return False
         
         return True
@@ -151,7 +153,7 @@ def register_user(email, password, fullname, phone, dob):
         
         # Validate DOB with year range check
         if not validate_dob(dob):
-            raise ValueError("Ngày sinh phải theo định dạng YYYY-MM-DD, năm từ 1900-2025")
+            raise ValueError(f"Ngày sinh phải theo định dạng YYYY-MM-DD, năm từ 1900 đến {datetime.now().year}")
         
         logger.info(f"[Register] Bắt đầu register email={email}")
         

@@ -62,8 +62,20 @@ const PersonalInfoTab = () => {
       newErrors.email = "Email không hợp lệ.";
     if (!phone.trim())
       newErrors.phone = "Vui lòng nhập số điện thoại.";
-    if (!dob)
+    if (!dob) {
       newErrors.dob = "Vui lòng chọn ngày sinh.";
+    } else {
+      const dobDate = new Date(dob);
+      const currentYear = new Date().getFullYear();
+      const birthYear = dobDate.getFullYear();
+      if (isNaN(dobDate.getTime())) {
+        newErrors.dob = "Ngày sinh không hợp lệ.";
+      } else if (birthYear < 1900 || birthYear > currentYear) {
+        newErrors.dob = `Năm sinh phải từ 1900 đến ${currentYear}.`;
+      } else if (dobDate > new Date()) {
+        newErrors.dob = "Ngày sinh không được ở tương lai.";
+      }
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -146,6 +158,8 @@ const PersonalInfoTab = () => {
               value={dob}
               onChange={(e) => { setDob(e.target.value); if (errors.dob) setErrors({ ...errors, dob: null }); }}
               className={inputClass(errors.dob)}
+              min="1900-01-01"
+              max={new Date().toISOString().split("T")[0]}
             />
             <FieldError field="dob" />
           </div>
