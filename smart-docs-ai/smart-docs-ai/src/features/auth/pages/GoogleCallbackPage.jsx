@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useDispatch } from "react-redux";
-import { toast } from "sonner";
 import { loginWithGoogleCode } from "@/store/slices/authSlice.js";
 
 function GoogleCallbackPage() {
@@ -19,8 +18,10 @@ function GoogleCallbackPage() {
     const errorDescription = params.get("error_description");
 
     if (error) {
-      toast.error(errorDescription || "Đăng nhập Google thất bại.");
-      navigate("/login", { replace: true });
+      navigate("/login", {
+        replace: true,
+        state: { authError: errorDescription || "Đăng nhập Google thất bại." },
+      });
       return;
     }
     if (!code) {
@@ -32,8 +33,10 @@ function GoogleCallbackPage() {
       .unwrap()
       .then(() => navigate("/app", { replace: true }))
       .catch((msg) => {
-        toast.error(msg || "Đăng nhập Google thất bại.");
-        navigate("/login", { replace: true });
+        navigate("/login", {
+          replace: true,
+          state: { authError: msg || "Đăng nhập Google thất bại." },
+        });
       });
   }, [dispatch, navigate]);
 

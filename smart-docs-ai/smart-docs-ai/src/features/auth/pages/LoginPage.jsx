@@ -1,9 +1,20 @@
 import LoginForm from "../components/LoginForm";
-import { useNavigate } from "react-router";
+import { useEffect } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { BrainCircuit, Sparkles, FileText, MessageSquare } from "lucide-react";
+import { toast } from "sonner";
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const authError = location.state?.authError;
+    if (!authError) return;
+
+    toast.error(authError);
+    navigate("/login", { replace: true, state: null });
+  }, [location.state, navigate]);
 
   return (
     <div className="auth-page min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-slate-950">
