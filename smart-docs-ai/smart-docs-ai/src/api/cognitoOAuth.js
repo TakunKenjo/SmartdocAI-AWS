@@ -38,6 +38,23 @@ export const exchangeCodeForTokens = async (code) => {
   return res.json(); // { id_token, access_token, refresh_token, expires_in, token_type }
 };
 
+export const checkGoogleEmailAllowed = async (idToken) => {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
+  const res = await fetch(`${apiBaseUrl}/api/auth/google/check-email`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Không thể đăng nhập bằng Google với email này.");
+  }
+
+  return res.json();
+};
+
 // Giải mã payload JWT — chỉ để đọc claim hiển thị UI (KHÔNG dùng để verify).
 // Backend vẫn luôn tự verify chữ ký thật mỗi khi gọi API, không tin dữ liệu này.
 export const decodeJwtPayload = (token) => {

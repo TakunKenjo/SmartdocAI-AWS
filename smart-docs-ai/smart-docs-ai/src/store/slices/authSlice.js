@@ -4,6 +4,7 @@ import { userPool } from "@/api/cognito.js";
 import { profileService } from "@/api/services/profileService.js";
 import {
   exchangeCodeForTokens,
+  checkGoogleEmailAllowed,
   decodeJwtPayload,
   persistCognitoSession,
 } from "@/api/cognitoOAuth.js";
@@ -59,6 +60,8 @@ export const loginWithGoogleCode = createAsyncThunk(
       const tokens = await exchangeCodeForTokens(code);
       const claims = decodeJwtPayload(tokens.id_token);
       const username = claims["cognito:username"];
+
+      await checkGoogleEmailAllowed(tokens.id_token);
 
       persistCognitoSession({
         idToken: tokens.id_token,

@@ -949,6 +949,12 @@ class ConfirmSignUpRequest(BaseModel):
     confirmation_code: str
 
 
+class GoogleLoginCheckResponse(BaseModel):
+    """Kết quả kiểm tra đăng nhập Google"""
+    success: bool
+    email: str
+
+
 # ─── Endpoints (Auth) ──────────────────────────────────────────────────────
 
 @app.post("/api/auth/register")
@@ -1031,6 +1037,29 @@ async def confirm_signup(request: ConfirmSignUpRequest):
     
     except Exception as e:
         logger.error(f"[Auth] ❌ ConfirmSignUp error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/auth/google/check-email", response_model=GoogleLoginCheckResponse)
+async def check_google_login_email(authorization: str = Header(None)):
+    """
+    Chặn flow Google login nếu email đã thuộc về một Cognito native user khác.
+    Đây là giải pháp ngắn hạn để tránh duplicate account cùng email nhưng khác sub.
+    """
+    user_id = require_user_id(authorization)
+    email = extract_email_from_token(authorization)
+
+    try:
+        if auth_service.has_native_user_with_email(email=email, current_user_id=user_id):
+            raise HTTPException(
+                status_code=409,
+                detail="Email này đã được đăng ký bằng mật khẩu. Vui lòng đăng nhập bằng email/mật khẩu."
+            )
+        return {"success": True, "email": email}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Auth] ❌ Google email check error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
