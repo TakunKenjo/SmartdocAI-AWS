@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -10,17 +10,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   define: {
-    global: 'window',
+    global: "window",
   },
   server: {
     watch: {
       // Bỏ qua file db.json (tránh dẫn đến tình trạng web tự động reload khi file db.json thay đổi)
       // Ví dụ: nếu file nằm ở server/db.json
-      ignored: ['**/db.json', '**/db/**']
+      ignored: ["**/db.json", "**/db/**"],
     },
     proxy: {
-      '/api': {
-        target: 'https://nxmlsvv3zk.execute-api.us-east-1.amazonaws.com/prod/',
+      "/api": {
+        target: "https://nxmlsvv3zk.execute-api.us-east-1.amazonaws.com/prod/",
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path,
@@ -28,19 +28,19 @@ export default defineConfig({
         proxyTimeout: 180000,
         timeout: 180000,
         configure: (proxy) => {
-          proxy.on('error', (err) => {
-            console.log('[Vite Proxy Error]', err.message);
+          proxy.on("error", (err) => {
+            console.log("[Vite Proxy Error]", err.message);
           });
-          proxy.on('proxyReq', (proxyReq, req) => {
-            console.log('[Vite Proxy]', req.method, req.url, '→ AWS Lambda');
+          proxy.on("proxyReq", (proxyReq, req) => {
+            console.log("[Vite Proxy]", req.method, req.url, "→ AWS Lambda");
           });
         },
-      }
-    }
+      },
+    },
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-    }
-  }
-})
+    },
+  },
+});

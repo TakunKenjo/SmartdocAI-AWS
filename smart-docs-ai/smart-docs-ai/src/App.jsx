@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from "react-router";
 import SmartdocPage from "@/features/smartdocs/pages/SmartdocPage.jsx";
 import LoginPage from "@/features/auth/pages/LoginPage.jsx";
 import RegisterPage from "@/features/auth/pages/RegisterPage.jsx";
+import GoogleCallbackPage from "@/features/auth/pages/GoogleCallbackPage.jsx";
 import ProtectedRoute from "@/features/auth/components/ProtectedRoute.jsx";
 import ProfilePage from "@/features/profile/pages/ProfilePage.jsx";
 import { ThemeProvider } from "@/contexts/ThemeContext.jsx";
@@ -35,6 +36,7 @@ function App() {
         {/* Public routes — auth */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/auth/callback" element={<GoogleCallbackPage />} />
 
         {/* Protected route — trang chính SmartDoc */}
         <Route

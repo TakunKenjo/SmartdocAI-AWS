@@ -108,6 +108,33 @@ def validate_dob(dob: str) -> bool:
         return False
 
 
+def has_native_user_with_email(email: str, current_user_id: str) -> bool:
+    """
+    Kiểm tra email Google có đang trùng với một user Cognito native hay không.
+    Native user của pool này dùng email làm Username; Google federated user thường
+    có Username dạng "Google_xxx". Nếu tìm thấy native user khác sub thì chặn để
+    tránh tạo hai tài khoản app cho cùng một email.
+    """
+    if not email:
+        return False
+
+    cognito = get_cognito_client()
+    response = cognito.list_users(
+        UserPoolId=COGNITO_USER_POOL_ID,
+        Filter=f'email = "{email}"'
+    )
+
+    for user in response.get('Users', []):
+        attrs = {attr['Name']: attr['Value'] for attr in user.get('Attributes', [])}
+        user_id = attrs.get('sub')
+        username = user.get('Username', '')
+
+        if user_id != current_user_id and username.lower() == email.lower():
+            return True
+
+    return False
+
+
 # ─── Register ────────────────────────────────────────────────────────────────
 
 def register_user(email, password, fullname, phone, dob):
