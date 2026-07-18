@@ -352,3 +352,40 @@ npm run build
 ```
 
 Ket qua: ca backend compile va frontend build deu pass.
+
+## Follow-up: Cognito Hosted UI bao `Login pages unavailable`
+
+Khi dang nhap Google, Cognito Hosted UI hien man hinh:
+
+```text
+Login pages unavailable
+Please contact an administrator.
+```
+
+Nguyen nhan xac dinh:
+
+- Frontend tao Google OAuth URL bang `window.location.origin`.
+- Cognito app client ban dau chi co callback URL `http://localhost:5173/auth/callback`.
+- Neu Vite dev server chay sang port khac nhu `5174`, `5175`, `5176`, redirect URI khong nam trong allowlist.
+- Cognito tra ve `/error?error=redirect_mismatch&client_id=...`, hien thi thanh man `Login pages unavailable`.
+
+Thao tac AWS da lam:
+
+- Cap nhat app client `63f74h4dj78kqihhoimv4acl8a` trong user pool `us-east-1_3oq5wIiuu`.
+- Them callback URLs local dev:
+  - `http://localhost:5173/auth/callback`
+  - `http://localhost:5174/auth/callback`
+  - `http://localhost:5175/auth/callback`
+  - `http://localhost:5176/auth/callback`
+  - `http://127.0.0.1:5173/auth/callback`
+  - `http://127.0.0.1:5174/auth/callback`
+  - `http://127.0.0.1:5175/auth/callback`
+  - `http://127.0.0.1:5176/auth/callback`
+- Them logout URLs tuong ung cho `/login` tren cac origin tren.
+- Giu OAuth flow `code`, scopes `openid email profile`, IdP `COGNITO` va `Google`.
+
+Validation:
+
+- Test authorize URL voi redirect URI `localhost:5173`, `5174`, `5175`, `5176`.
+- Tat ca deu tra `302` sang `https://accounts.google.com/o/oauth2/v2/auth...`.
+- Khong con redirect ve `/error?error=redirect_mismatch`.
