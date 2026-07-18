@@ -3,6 +3,18 @@ import { useNavigate } from "react-router";
 import { useDispatch } from "react-redux";
 import { loginWithGoogleCode } from "@/store/slices/authSlice.js";
 
+const normalizeAuthError = (message) => {
+  if (!message) return "Đăng nhập Google thất bại.";
+
+  const cleaned = message.replace(/^PreSignUp failed with error\s*/i, "").trim();
+
+  if (cleaned === "An error occurred") {
+    return "Không thể đăng nhập bằng Google lúc này. Vui lòng thử lại sau.";
+  }
+
+  return cleaned;
+};
+
 function GoogleCallbackPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -20,7 +32,7 @@ function GoogleCallbackPage() {
     if (error) {
       navigate("/login", {
         replace: true,
-        state: { authError: errorDescription || "Đăng nhập Google thất bại." },
+        state: { authError: normalizeAuthError(errorDescription) },
       });
       return;
     }
