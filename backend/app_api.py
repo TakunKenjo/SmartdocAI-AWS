@@ -1278,7 +1278,6 @@ class ChangePasswordRequest(BaseModel):
     """Đổi mật khẩu"""
     current_password: Optional[str] = None
     new_password: str
-    is_google_user: bool = False
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────
@@ -1357,14 +1356,18 @@ def change_password(
 
         if not user_id:
             raise ValueError("Token không chứa 'sub' claim")
-        
+
+        # Đọc password_set từ DynamoDB để quyết định có bắt current password không
+        user_profile = profile_service.ensure_user_profile(user_id)
+        password_set = user_profile.get("password_set", True) if user_profile else True
+
         result = profile_service.change_password(
             user_id=user_id,
             email=email,
             current_username=current_username,
             current_password=data.current_password,
             new_password=data.new_password,
-            is_google_user=data.is_google_user or token_has_google_identity(claims),
+            password_set=password_set,
         )
         return result
         

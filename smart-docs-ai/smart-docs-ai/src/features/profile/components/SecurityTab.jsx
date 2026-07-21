@@ -98,11 +98,10 @@ const PasswordField = memo(({ label, value, onChange, show, onToggle, field, err
 const SecurityTab = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
-  const tokenClaims = getStoredIdTokenClaims();
-  const isGoogleUser =
-    user?.authProvider === "google" ||
-    user?.cognitoUsername?.startsWith("Google_") ||
-    hasGoogleIdentity(tokenClaims);
+
+  // password_set=false → lần đầu thiết lập (không cần current password)
+  // password_set=true hoặc undefined (user cũ, an toàn) → bắt buộc nhập current password
+  const passwordSet = user?.password_set !== false;
 
   const [currentPassword,  setCurrentPassword]  = useState("");
   const [newPassword,      setNewPassword]       = useState("");
@@ -144,7 +143,7 @@ const SecurityTab = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!isGoogleUser && !currentPassword)
+    if (passwordSet && !currentPassword)
       newErrors.currentPassword = "Vui lòng nhập mật khẩu hiện tại.";
     if (!newPassword)
       newErrors.newPassword = "Vui lòng nhập mật khẩu mới.";
@@ -162,8 +161,8 @@ const SecurityTab = () => {
     if (!validateForm()) return;
     setIsSubmitting(true);
     try {
-      await dispatch(changePassword({ currentPassword, newPassword, isGoogleUser })).unwrap();
-      toast.success(isGoogleUser ? "Thiết lập mật khẩu thành công!" : "Đổi mật khẩu thành công!");
+      await dispatch(changePassword({ currentPassword, newPassword })).unwrap();
+      toast.success(!passwordSet ? "Thiết lập mật khẩu thành công!" : "Đổi mật khẩu thành công!");
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
     } catch (error) {
       toast.error("Đã xảy ra lỗi!", { description: error });
@@ -177,7 +176,7 @@ const SecurityTab = () => {
       <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
         <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Bảo mật</p>
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-          {isGoogleUser
+          {!passwordSet
             ? "Thiết lập mật khẩu để có thể đăng nhập bằng email và mật khẩu"
             : "Thay đổi mật khẩu đăng nhập của bạn"}
         </p>
@@ -185,7 +184,7 @@ const SecurityTab = () => {
 
       <CardContent className="pt-4 space-y-4">
 
-        {!isGoogleUser && (
+        {passwordSet && (
           <PasswordField
             label="Mật khẩu hiện tại"
             value={currentPassword}
@@ -219,7 +218,7 @@ const SecurityTab = () => {
 
         {/* Info note */}
         <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
-          {isGoogleUser
+          {!passwordSet
             ? "Sau khi thiết lập, bạn vẫn có thể đăng nhập bằng Google hoặc dùng email và mật khẩu mới."
             : "Mật khẩu mới sẽ được áp dụng cho tất cả thiết bị đăng nhập tiếp theo."}
         </p>
@@ -233,7 +232,7 @@ const SecurityTab = () => {
             <Save className="h-3.5 w-3.5 mr-1.5" />
             {isSubmitting
               ? "Đang cập nhật..."
-              : isGoogleUser
+              : !passwordSet
                 ? "Thiết lập mật khẩu"
                 : "Cập nhật mật khẩu"}
           </Button>

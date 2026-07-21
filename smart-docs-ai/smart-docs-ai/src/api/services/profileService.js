@@ -51,7 +51,6 @@ export const profileService = {
     const res = await axiosClient.post("/api/profile/change-password", {
       current_password: data.currentPassword,
       new_password: data.newPassword,
-      is_google_user: data.isGoogleUser,
     });
     return res.data;
   },

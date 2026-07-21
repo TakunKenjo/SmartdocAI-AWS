@@ -170,16 +170,7 @@ def ensure_user_profile(user_id: str) -> Dict[str, Any]:
             "avatar_url": None,
             "created_at": timestamp,
             "updated_at": timestamp,
-            "subscription_plan": "free",
-            "document_quota": 50,
-            "documents_used": 0,
-            "storage_quota_gb": 1,
-            "user_preferences": {
-                "language": "vi",
-                "theme": "light",
-                "notifications_enabled": True,
-                "timezone": "Asia/Ho_Chi_Minh",
-            },
+            "password_set": False,
         }
         
         table.put_item(Item=new_profile, ConditionExpression='attribute_not_exists(user_id)')
@@ -485,18 +476,20 @@ def change_password(
     current_username: str,
     current_password: Optional[str],
     new_password: str,
-    is_google_user: bool = False,
+    password_set: bool = True,
 ) -> Dict[str, Any]:
     """
-    Đổi mật khẩu người dùng qua Cognito AdminSetUserPassword
-    
+    Đổi mật khẩu người dùng qua Cognito AdminSetUserPassword.
+
     Args:
         user_id: Cognito sub
         email: Email của user
         current_username: Cognito Username thật từ token
-        current_password: Mật khẩu hiện tại với native user
+        current_password: Mật khẩu hiện tại (bắt buộc nếu password_set=True)
         new_password: Mật khẩu mới
-    
+        password_set: True nếu user đã từng set password trước đó (bắt buộc nhập current);
+                      False nếu đây là lần đầu thiết lập mật khẩu (bỏ qua current).
+
     Returns:
         Success response
     """
@@ -504,19 +497,12 @@ def change_password(
         if not new_password:
             raise ValueError("Mật khẩu mới không được để trống")
 
-        if not is_google_user and not current_password:
+        if password_set and not current_password:
             raise ValueError("Vui lòng nhập mật khẩu hiện tại")
-        
+
         if len(new_password) < 6:
             raise ValueError("Mật khẩu mới phải có ít nhất 6 ký tự")
-        
-        # Đảm bảo user profile tồn tại trong DynamoDB (tự động tạo nếu cần)
-        user_profile = ensure_user_profile(user_id)
-        if not user_profile:
-            raise ValueError("Không thể tạo/lấy user profile")
-        
-        # Google-only users do not have a current native password yet, so they
-        # are allowed to set one for the authenticated Cognito account.
+
         cognito = get_cognito_client()
         cognito.admin_set_user_password(
             UserPoolId=COGNITO_USERPOOL_ID,
@@ -524,9 +510,20 @@ def change_password(
             Password=new_password,
             Permanent=True
         )
-        
+
+        # Đánh dấu password đã được set để các lần sau bắt buộc nhập current password
+        try:
+            table = get_dynamodb_resource().Table(USERS_TABLE)
+            table.update_item(
+                Key={"user_id": user_id},
+                UpdateExpression="SET password_set = :val, updated_at = :now",
+                ExpressionAttributeValues={":val": True, ":now": get_timestamp()},
+            )
+        except Exception as db_err:
+            logger.warning(f"[DynamoDB] Không cập nhật được password_set: {db_err}")
+
         logger.info(f"[Cognito] Đổi mật khẩu: {user_id} ({email})")
-        
+
         return {
             "success": True,
             "user_id": user_id,

@@ -233,12 +233,11 @@ export const updatePersonalInfo = createAsyncThunk(
 // ─── Đổi mật khẩu (Backend API) ───────────────────────────────────
 export const changePassword = createAsyncThunk(
   "auth/changePassword",
-  async ({ currentPassword, newPassword, isGoogleUser }, { rejectWithValue }) => {
+  async ({ currentPassword, newPassword }, { rejectWithValue }) => {
     try {
       const res = await profileService.changePassword({
         currentPassword,
         newPassword,
-        isGoogleUser,
       });
       return true;
     } catch (err) {

@@ -349,16 +349,7 @@ def confirm_user_signup(email, confirmation_code):
                     'avatar_url': None,
                     'created_at': timestamp,
                     'updated_at': timestamp,
-                    'subscription_plan': 'free',
-                    'document_quota': 50,
-                    'documents_used': 0,
-                    'storage_quota_gb': 1,
-                    'user_preferences': {
-                        'language': 'vi',
-                        'theme': 'light',
-                        'notifications_enabled': True,
-                        'timezone': 'Asia/Ho_Chi_Minh',
-                    },
+                    'password_set': True,
                 },
                 ConditionExpression='attribute_not_exists(user_id)'
             )
