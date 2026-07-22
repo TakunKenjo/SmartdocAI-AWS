@@ -16,7 +16,18 @@ phases:
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
+      - echo Installing test dependencies
+      - pip install pytest pytest-cov flake8
 
+  test:
+    commands:
+      - echo Running code quality checks
+      - cd backend
+      - echo "=== Running flake8 linting ==="
+      - flake8 . --max-line-length=120 --exclude=hf_cache,__pycache__,.pytest_cache --statistics
+      - echo "=== Running pytest ==="
+      - pytest test_*.py -v --tb=short --color=yes
+      - cd ..
 
   build:
     commands:
