@@ -21,9 +21,10 @@ phases:
       - echo "=== Running code quality checks ==="
       - cd backend
       - echo "--- Running flake8 linting ---"
-      - flake8 . --max-line-length=120 --exclude=hf_cache,__pycache__,.pytest_cache --statistics || echo "Flake8 found issues but continuing..."
-      - echo "--- Running pytest ---"
-      - pytest test_*.py -v --tb=short --color=yes || echo "Some tests failed but continuing for now..."
+      - flake8 . --max-line-length=120 --exclude=hf_cache,__pycache__,.pytest_cache,manual_test_*.py --statistics --exit-zero
+      - echo "--- Running pytest unit tests ---"
+      - pytest test_*_unit.py -v --tb=short --color=yes --strict-markers
+      - echo "✅ All tests passed! Proceeding to build..."
       - cd ..
 
   build:
