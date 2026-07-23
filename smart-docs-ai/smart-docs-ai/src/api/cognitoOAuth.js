@@ -2,9 +2,17 @@ const COGNITO_DOMAIN =
   "https://smartdocai-fayrun2026.auth.us-east-1.amazoncognito.com";
 const CLIENT_ID = "63f74h4dj78kqihhoimv4acl8a";
 const getRedirectUri = () => `${window.location.origin}/auth/callback`;
+const OAUTH_STATE_KEY = "oauth_state";
 
 // Tạo URL để chuyển hướng người dùng sang màn hình đăng nhập Google (qua Cognito Hosted UI)
+// Kèm theo tham số "state" ngẫu nhiên để chống tấn công CSRF (login CSRF / OAuth code injection):
+// - Sinh ra 1 giá trị ngẫu nhiên, lưu tạm vào sessionStorage của trình duyệt hiện tại.
+// - Khi Cognito redirect về /auth/callback, "state" phải được echo lại y nguyên.
+// - Nếu không khớp (hoặc bị thiếu) -> có khả năng authorization code bị đánh cắp/giả mạo -> từ chối.
 export const getGoogleLoginUrl = () => {
+  const state = crypto.randomUUID();
+  sessionStorage.setItem(OAUTH_STATE_KEY, state);
+
   const params = new URLSearchParams({
     identity_provider: "Google",
     client_id: CLIENT_ID,
@@ -12,8 +20,17 @@ export const getGoogleLoginUrl = () => {
     scope: "openid email profile",
     redirect_uri: getRedirectUri(),
     prompt: "select_account",
+    state,
   });
   return `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
+};
+
+// So sánh "state" nhận được từ Cognito callback với giá trị đã lưu trước đó.
+// Luôn xóa giá trị đã lưu sau khi kiểm tra (dùng 1 lần) để tránh replay.
+export const verifyOAuthState = (returnedState) => {
+  const savedState = sessionStorage.getItem(OAUTH_STATE_KEY);
+  sessionStorage.removeItem(OAUTH_STATE_KEY);
+  return Boolean(savedState) && savedState === returnedState;
 };
 
 // Đổi authorization code lấy token thật từ Cognito
