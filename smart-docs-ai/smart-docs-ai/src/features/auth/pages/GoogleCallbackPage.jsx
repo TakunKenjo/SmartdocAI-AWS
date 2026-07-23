@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useDispatch } from "react-redux";
 import { loginWithGoogleCode } from "@/store/slices/authSlice.js";
+import { verifyOAuthState } from "@/api/cognitoOAuth.js";
 
 const normalizeAuthError = (message) => {
   if (!message) return "Đăng nhập Google thất bại.";
@@ -28,6 +29,7 @@ function GoogleCallbackPage() {
     const code = params.get("code");
     const error = params.get("error");
     const errorDescription = params.get("error_description");
+    const returnedState = params.get("state");
 
     if (error) {
       navigate("/login", {
@@ -38,6 +40,20 @@ function GoogleCallbackPage() {
     }
     if (!code) {
       navigate("/login", { replace: true });
+      return;
+    }
+
+    // Chống CSRF: "state" trả về phải khớp với giá trị đã lưu lúc redirect đi Google.
+    // Nếu không khớp (thiếu, bị sửa, hoặc code bị đánh cắp từ 1 phiên login khác)
+    // -> từ chối luôn, không đổi code lấy token.
+    if (!verifyOAuthState(returnedState)) {
+      navigate("/login", {
+        replace: true,
+        state: {
+          authError:
+            "Phiên đăng nhập Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.",
+        },
+      });
       return;
     }
 
